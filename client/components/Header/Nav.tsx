@@ -73,10 +73,10 @@ function Nav() {
             >
               <FolderIcon className="w-5 h-5 text-slate-300" />
               <Link
-                href="/projects"
+                href="/sign-in"
                 className="text-slate-300 hover:text-white transition duration-300 text-lg md:text-xl"
               >
-                
+                SignIn
               </Link>
             </div>
 
@@ -86,10 +86,10 @@ function Nav() {
             >
               <PhoneIcon className="w-5 h-5 text-slate-300" />
               <Link
-                href="/contacts"
+                href="/sign-up"
                 className="text-slate-300 hover:text-white transition duration-300 text-lg md:text-xl"
               >
-                Contacts
+                SignUp
               </Link>
             </div>
 
@@ -131,7 +131,6 @@ function Nav() {
         </div>
       </div>
 
-      
       <div className="mt-[14vh]"></div>
 
       {/* Mobile Navigation Links */}
@@ -164,21 +163,21 @@ function Nav() {
           <li className="flex items-center space-x-2">
             <FolderIcon className="w-5 h-5 text-slate-300" />
             <Link
-              href="/projects"
+              href="/sign-up"
               onClick={toggleMobileMenu}
               className="text-slate-300 hover:text-white block"
             >
-              Projects
+              sign-up
             </Link>
           </li>
           <li className="flex items-center space-x-2">
             <PhoneIcon className="w-5 h-5 text-slate-300" />
             <Link
-              href="/contacts"
+              href="/sign-in"
               onClick={toggleMobileMenu}
               className="text-slate-300 hover:text-white block"
             >
-              Contacts
+              signin
             </Link>
           </li>
         </ul>
