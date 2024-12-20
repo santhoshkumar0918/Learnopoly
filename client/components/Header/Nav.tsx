@@ -63,7 +63,7 @@ function Nav() {
                 href="/about"
                 className="text-slate-300 hover:text-white transition duration-300 text-lg md:text-xl"
               >
-                About
+                Explorer
               </Link>
             </div>
 
@@ -76,7 +76,7 @@ function Nav() {
                 href="/projects"
                 className="text-slate-300 hover:text-white transition duration-300 text-lg md:text-xl"
               >
-                Projects
+                
               </Link>
             </div>
 
@@ -131,7 +131,7 @@ function Nav() {
         </div>
       </div>
 
-      {/* Add Margin Below Header */}
+      
       <div className="mt-[14vh]"></div>
 
       {/* Mobile Navigation Links */}
