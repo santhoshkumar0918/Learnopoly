@@ -1,6 +1,7 @@
 import { supabase } from "@/app/lib/supabase";
+import { useUser } from "@clerk/nextjs";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 
 
@@ -19,6 +20,9 @@ async function fetchPosts(){
 export default function Feed(){
 
     const queryClient = useQueryClient();
+    const { user, isLoaded } = useUser();
+    const [content, setContent] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const {data:posts,isLoading,isError,error} = useQuery({
         queryKey:['posts'],
@@ -28,7 +32,12 @@ export default function Feed(){
     })
 
     useEffect({
-        
+        const subsriction  = supabase
+          .from('posts')
+      .on('INSERT', (payload) => {
+        queryClient.setQueryData(['posts'], (oldPosts) => [payload.new, ...oldPosts]);
+      })
+      .subscribe();
     }.[])
 
 }
