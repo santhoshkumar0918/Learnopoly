@@ -26,7 +26,6 @@ function Nav() {
       {/* Navigation Bar */}
       <div className="h-[12vh] bg-gray-950 w-full rounded-b-3xl px-6 lg:px-8 bg-opacity-40 mt-1 backdrop-blur-xl shadow-lg fixed top-0 left-0 right-0 z-50">
         <div className="flex items-center justify-between w-full h-full">
-          {/* Logo Section */}
           <div className="flex items-center space-x-2">
             <h1 className="text-[18px] md:text-[24px] font-bold text-slate-300">
               <span className="text-[30px] md:text-[40px] text-teal-400">
