@@ -5,18 +5,16 @@ import {
   XMarkIcon,
   HomeIcon,
   UserIcon,
-  FolderIcon,
-  PhoneIcon,
   ChartBarIcon,
   NewspaperIcon,
+  ArrowLeftOnRectangleIcon,
 } from "@heroicons/react/24/outline";
-import { motion } from "framer-motion";
-import { useUser, UserButton } from "@clerk/nextjs";
+import { UserButton, useUser } from "@clerk/nextjs";
 
 function Nav() {
   const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [hoveredLink, setHoveredLink] = useState<string | null>(null);
-  const { isSignedIn } = useUser();
+  const { isSignedIn, user } = useUser();
 
   const toggleMobileMenu = () => {
     setMobileMenuOpen(!isMobileMenuOpen);
@@ -24,6 +22,54 @@ function Nav() {
 
   const handleMouseEnter = (link: string) => setHoveredLink(link);
   const handleMouseLeave = () => setHoveredLink(null);
+
+  const AuthButtons = () => {
+    if (isSignedIn) {
+      return <UserButton afterSignOutUrl="/" />;
+    }
+
+    return (
+      <>
+        <Link href="/auth/sign-in" className="text-slate-300 hover:text-white">
+          Sign In
+        </Link>
+        <Link href="/auth/sign-up" className="text-slate-300 hover:text-white">
+          Sign Up
+        </Link>
+      </>
+    );
+  };
+
+  const MobileAuthButtons = () => {
+    if (isSignedIn) {
+      return (
+        <li className="flex items-center space-x-2 text-slate-300">
+          <UserButton afterSignOutUrl="/" />
+        </li>
+      );
+    }
+
+    return (
+      <>
+        <li>
+          <Link
+            href="/auth/sign-in"
+            className="text-slate-300 hover:text-white block"
+          >
+            Sign In
+          </Link>
+        </li>
+        <li>
+          <Link
+            href="/auth/sign-up"
+            className="text-slate-300 hover:text-white block"
+          >
+            Sign Up
+          </Link>
+        </li>
+      </>
+    );
+  };
 
   return (
     <>
@@ -63,34 +109,7 @@ function Nav() {
               </div>
             ))}
 
-            {/* Show Sign In / Sign Up if NOT signed in */}
-            {!isSignedIn ? (
-              <>
-                <Link href="/sign-in" className="text-slate-300">
-                  Sign In
-                </Link>
-                <Link href="/sign-up" className="text-slate-300">
-                  Sign Up
-                </Link>
-              </>
-            ) : (
-              <UserButton afterSignOutUrl="/" />
-            )}
-
-            <motion.div
-              className="absolute bottom-[-15px] left-0 w-full h-[3px] bg-gradient-to-r from-transparent via-teal-300 to-transparent"
-              initial={{ x: "-100%" }}
-              animate={{
-                x: hoveredLink
-                  ? `${
-                      ["Home", "Explorer", "Dashboard", "Feed"].indexOf(
-                        hoveredLink
-                      ) * 20
-                    }%`
-                  : "-100%",
-              }}
-              transition={{ duration: 0.5, ease: "easeInOut" }}
-            />
+            <AuthButtons />
           </div>
 
           <div className="md:hidden flex items-center">
@@ -110,9 +129,7 @@ function Nav() {
         </div>
       </div>
 
-      <div className="mt-[14vh]"></div>
-
-      {/* Mobile Nav */}
+      {/* Mobile Menu */}
       <nav
         className={`md:hidden fixed top-0 left-0 h-full w-[60%] bg-purple-300 bg-opacity-90 backdrop-blur-xl p-6 shadow-lg transition-transform duration-300 ease-in-out transform z-50 ${
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
@@ -139,29 +156,11 @@ function Nav() {
               </Link>
             </li>
           ))}
-
-          {/* Conditionally Show Sign In / Sign Up */}
-          {!isSignedIn ? (
-            <>
-              <li>
-                <Link href="/sign-in" className="text-slate-300">
-                  Sign In
-                </Link>
-              </li>
-              <li>
-                <Link href="/sign-up" className="text-slate-300">
-                  Sign Up
-                </Link>
-              </li>
-            </>
-          ) : (
-            <li>
-              <UserButton afterSignOutUrl="/" />
-            </li>
-          )}
+          <MobileAuthButtons />
         </ul>
       </nav>
 
+      {/* Backdrop for Mobile Menu */}
       {isMobileMenuOpen && (
         <div
           onClick={toggleMobileMenu}

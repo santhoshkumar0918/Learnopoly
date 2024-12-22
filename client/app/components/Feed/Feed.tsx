@@ -1,5 +1,4 @@
 "use client"
-
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useUser } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
