@@ -7,6 +7,9 @@ import {
   UserIcon,
   FolderIcon,
   PhoneIcon,
+  ChartBarIcon,
+  GlobeAltIcon,
+  NewspaperIcon,
 } from "@heroicons/react/24/outline";
 import { motion } from "framer-motion";
 
@@ -23,7 +26,6 @@ function Nav() {
 
   return (
     <>
-      {/* Navigation Bar */}
       <div className="h-[12vh] bg-gray-950 w-full rounded-b-3xl px-6 lg:px-8 bg-opacity-40 mt-1 backdrop-blur-xl shadow-lg fixed top-0 left-0 right-0 z-50">
         <div className="flex items-center justify-between w-full h-full">
           <div className="flex items-center space-x-2">
@@ -35,84 +37,49 @@ function Nav() {
             </h1>
           </div>
 
-          {/* Desktop Navigation Links */}
           <div
-            className="hidden md:flex flex-1 justify-center space-x-24 items-center relative"
+            className="hidden md:flex flex-1 justify-center space-x-16 items-center relative"
             onMouseLeave={handleMouseLeave}
           >
-            <div
-              onMouseEnter={() => handleMouseEnter("home")}
-              className="relative flex items-center space-x-2"
-            >
-              <HomeIcon className="w-5 h-5 text-slate-300" />
-              <Link
-                href="/"
-                className="text-slate-300 hover:text-white transition duration-300 text-lg md:text-xl"
+            {[
+              { name: "Home", href: "/", icon: HomeIcon },
+              { name: "Explorer", href: "/explorer", icon: UserIcon },
+              { name: "Dashboard", href: "/dashboard", icon: ChartBarIcon },
+              { name: "Feed", href: "/feed", icon: NewspaperIcon },
+              { name: "Sign In", href: "/sign-in", icon: FolderIcon },
+              { name: "Sign Up", href: "/sign-up", icon: PhoneIcon },
+            ].map((item) => (
+              <div
+                key={item.name}
+                onMouseEnter={() => handleMouseEnter(item.name)}
+                className="relative flex items-center space-x-2"
               >
-                Home
-              </Link>
-            </div>
+                <item.icon className="w-5 h-5 text-slate-300" />
+                <Link
+                  href={item.href}
+                  className="text-slate-300 hover:text-white transition duration-300 text-lg md:text-xl"
+                >
+                  {item.name}
+                </Link>
+              </div>
+            ))}
 
-            <div
-              onMouseEnter={() => handleMouseEnter("about")}
-              className="relative flex items-center space-x-2"
-            >
-              <UserIcon className="w-5 h-5 text-slate-300" />
-              <Link
-                href="/about"
-                className="text-slate-300 hover:text-white transition duration-300 text-lg md:text-xl"
-              >
-                Explorer
-              </Link>
-            </div>
-
-            <div
-              onMouseEnter={() => handleMouseEnter("projects")}
-              className="relative flex items-center space-x-2"
-            >
-              <FolderIcon className="w-5 h-5 text-slate-300" />
-              <Link
-                href="/sign-in"
-                className="text-slate-300 hover:text-white transition duration-300 text-lg md:text-xl"
-              >
-                SignIn
-              </Link>
-            </div>
-
-            <div
-              onMouseEnter={() => handleMouseEnter("contacts")}
-              className="relative flex items-center space-x-2"
-            >
-              <PhoneIcon className="w-5 h-5 text-slate-300" />
-              <Link
-                href="/sign-up"
-                className="text-slate-300 hover:text-white transition duration-300 text-lg md:text-xl"
-              >
-                SignUp
-              </Link>
-            </div>
-
-            {/* Hover Animation */}
             <motion.div
               className="absolute bottom-[-15px] left-0 w-full h-[3px] bg-gradient-to-r from-transparent via-teal-300 to-transparent"
               initial={{ x: "-100%" }}
               animate={{
-                x:
-                  hoveredLink === "home"
-                    ? "-25%"
-                    : hoveredLink === "about"
-                    ? "0%"
-                    : hoveredLink === "projects"
-                    ? "25%"
-                    : hoveredLink === "contacts"
-                    ? "50%"
-                    : "-100%",
+                x: hoveredLink
+                  ? `${
+                      ["Home", "Explorer", "Dashboard", "Feed"].indexOf(
+                        hoveredLink
+                      ) * 20
+                    }%`
+                  : "-100%",
               }}
               transition={{ duration: 0.5, ease: "easeInOut" }}
             />
           </div>
 
-          {/* Mobile Menu Button */}
           <div className="md:hidden flex items-center">
             <button
               onClick={toggleMobileMenu}
@@ -132,57 +99,37 @@ function Nav() {
 
       <div className="mt-[14vh]"></div>
 
-      {/* Mobile Navigation Links */}
       <nav
         className={`md:hidden fixed top-0 left-0 h-full w-[60%] bg-purple-300 bg-opacity-90 backdrop-blur-xl p-6 shadow-lg transition-transform duration-300 ease-in-out transform z-50 ${
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         <ul className="space-y-4 mt-8">
-          <li className="flex items-center space-x-2">
-            <HomeIcon className="w-5 h-5 text-slate-300" />
-            <Link
-              href="/"
+          {[
+            { name: "Home", href: "/", icon: HomeIcon },
+            { name: "Explorer", href: "/explorer", icon: UserIcon },
+            { name: "Dashboard", href: "/dashboard", icon: ChartBarIcon },
+            { name: "Feed", href: "/feed", icon: NewspaperIcon },
+            { name: "Sign In", href: "/sign-in", icon: FolderIcon },
+            { name: "Sign Up", href: "/sign-up", icon: PhoneIcon },
+          ].map((item) => (
+            <li
+              key={item.name}
+              className="flex items-center space-x-2"
               onClick={toggleMobileMenu}
-              className="text-slate-300 hover:text-white block"
             >
-              Home
-            </Link>
-          </li>
-          <li className="flex items-center space-x-2">
-            <UserIcon className="w-5 h-5 text-slate-300" />
-            <Link
-              href="/about"
-              onClick={toggleMobileMenu}
-              className="text-slate-300 hover:text-white block"
-            >
-              About
-            </Link>
-          </li>
-          <li className="flex items-center space-x-2">
-            <FolderIcon className="w-5 h-5 text-slate-300" />
-            <Link
-              href="/sign-up"
-              onClick={toggleMobileMenu}
-              className="text-slate-300 hover:text-white block"
-            >
-              sign-up
-            </Link>
-          </li>
-          <li className="flex items-center space-x-2">
-            <PhoneIcon className="w-5 h-5 text-slate-300" />
-            <Link
-              href="/sign-in"
-              onClick={toggleMobileMenu}
-              className="text-slate-300 hover:text-white block"
-            >
-              signin
-            </Link>
-          </li>
+              <item.icon className="w-5 h-5 text-slate-300" />
+              <Link
+                href={item.href}
+                className="text-slate-300 hover:text-white block"
+              >
+                {item.name}
+              </Link>
+            </li>
+          ))}
         </ul>
       </nav>
 
-      {/* Background overlay */}
       {isMobileMenuOpen && (
         <div
           onClick={toggleMobileMenu}
