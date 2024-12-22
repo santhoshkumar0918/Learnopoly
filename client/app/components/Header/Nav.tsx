@@ -8,14 +8,15 @@ import {
   FolderIcon,
   PhoneIcon,
   ChartBarIcon,
-  GlobeAltIcon,
   NewspaperIcon,
 } from "@heroicons/react/24/outline";
 import { motion } from "framer-motion";
+import { useUser, UserButton } from "@clerk/nextjs";
 
 function Nav() {
   const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [hoveredLink, setHoveredLink] = useState<string | null>(null);
+  const { isSignedIn } = useUser();
 
   const toggleMobileMenu = () => {
     setMobileMenuOpen(!isMobileMenuOpen);
@@ -46,8 +47,6 @@ function Nav() {
               { name: "Explorer", href: "/explorer", icon: UserIcon },
               { name: "Dashboard", href: "/dashboard", icon: ChartBarIcon },
               { name: "Feed", href: "/feed", icon: NewspaperIcon },
-              { name: "Sign In", href: "/sign-in", icon: FolderIcon },
-              { name: "Sign Up", href: "/sign-up", icon: PhoneIcon },
             ].map((item) => (
               <div
                 key={item.name}
@@ -63,6 +62,20 @@ function Nav() {
                 </Link>
               </div>
             ))}
+
+            {/* Show Sign In / Sign Up if NOT signed in */}
+            {!isSignedIn ? (
+              <>
+                <Link href="/sign-in" className="text-slate-300">
+                  Sign In
+                </Link>
+                <Link href="/sign-up" className="text-slate-300">
+                  Sign Up
+                </Link>
+              </>
+            ) : (
+              <UserButton afterSignOutUrl="/" />
+            )}
 
             <motion.div
               className="absolute bottom-[-15px] left-0 w-full h-[3px] bg-gradient-to-r from-transparent via-teal-300 to-transparent"
@@ -99,6 +112,7 @@ function Nav() {
 
       <div className="mt-[14vh]"></div>
 
+      {/* Mobile Nav */}
       <nav
         className={`md:hidden fixed top-0 left-0 h-full w-[60%] bg-purple-300 bg-opacity-90 backdrop-blur-xl p-6 shadow-lg transition-transform duration-300 ease-in-out transform z-50 ${
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
@@ -110,8 +124,6 @@ function Nav() {
             { name: "Explorer", href: "/explorer", icon: UserIcon },
             { name: "Dashboard", href: "/dashboard", icon: ChartBarIcon },
             { name: "Feed", href: "/feed", icon: NewspaperIcon },
-            { name: "Sign In", href: "/sign-in", icon: FolderIcon },
-            { name: "Sign Up", href: "/sign-up", icon: PhoneIcon },
           ].map((item) => (
             <li
               key={item.name}
@@ -127,6 +139,26 @@ function Nav() {
               </Link>
             </li>
           ))}
+
+          {/* Conditionally Show Sign In / Sign Up */}
+          {!isSignedIn ? (
+            <>
+              <li>
+                <Link href="/sign-in" className="text-slate-300">
+                  Sign In
+                </Link>
+              </li>
+              <li>
+                <Link href="/sign-up" className="text-slate-300">
+                  Sign Up
+                </Link>
+              </li>
+            </>
+          ) : (
+            <li>
+              <UserButton afterSignOutUrl="/" />
+            </li>
+          )}
         </ul>
       </nav>
 
