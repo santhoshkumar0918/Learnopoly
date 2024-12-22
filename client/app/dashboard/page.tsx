@@ -1,13 +1,18 @@
-"use client";
+import Feed from "../components/Feed/Feed";
+import { useUser } from "@clerk/nextjs";
 
-import { useAuth } from "@clerk/nextjs";
+export default function Dashboard() {
+  const { user, isLoaded } = useUser();
 
-export default function DashboardPage() {
-  const { userId } = useAuth();
-
-  if (!userId) {
-    return <div>You must be signed in to view this page.</div>;
-  }
-
-  return <div>Welcome to your dashboard!</div>;
+  return (
+    <div>
+      
+      <div className="max-w-2xl mx-auto mt-8">
+        <h1 className="text-3xl font-bold mb-4">
+          Welcome, {isLoaded && user ? user.firstName : "Guest"}
+        </h1>
+        <Feed />
+      </div>
+    </div>
+  );
 }

@@ -3,8 +3,6 @@ import { useUser } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 
-
-
 async function fetchPosts() {
   const { data, error } = await supabase
     .from("posts")
@@ -21,7 +19,6 @@ export default function Feed() {
   const [content, setContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-
   const {
     data: posts,
     isLoading,
@@ -33,16 +30,19 @@ export default function Feed() {
     staleTime: 1000 * 60 * 5,
   });
 
-  
   useEffect(() => {
     const subscription = supabase
-      .channel('public:posts')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, (payload) => {
-        queryClient.setQueryData(["posts"], (oldPosts: any) => [
-          payload.new,
-          ...oldPosts,
-        ]);
-      })
+      .channel("public:posts")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "posts" },
+        (payload) => {
+          queryClient.setQueryData(["posts"], (oldPosts: any) => [
+            payload.new,
+            ...oldPosts,
+          ]);
+        }
+      )
       .subscribe();
 
     return () => {
@@ -50,7 +50,6 @@ export default function Feed() {
     };
   }, [queryClient]);
 
- 
   const handlePostSubmit = async () => {
     if (!content) return;
     setIsSubmitting(true);
@@ -69,7 +68,6 @@ export default function Feed() {
     setIsSubmitting(false);
   };
 
-  
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -83,7 +81,6 @@ export default function Feed() {
     );
   }
 
-  
   if (isError) {
     return (
       <div className="text-red-500 p-4">
@@ -94,7 +91,6 @@ export default function Feed() {
 
   return (
     <div className="space-y-4">
- 
       {isLoaded && user ? (
         <div className="border p-4 rounded-lg shadow">
           <textarea
@@ -120,7 +116,6 @@ export default function Feed() {
         </div>
       )}
 
-     
       {posts?.map((post) => (
         <div key={post.id} className="border p-4 rounded-lg shadow">
           <div className="font-bold">
@@ -135,3 +130,6 @@ export default function Feed() {
     </div>
   );
 }
+
+
+
