@@ -133,7 +133,8 @@
 //   );
 // }
 // 
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
 import { createClient } from "@supabase/supabase-js";
 
@@ -145,41 +146,103 @@ const supabase = createClient(
 
 export default function Feed() {
   const [content, setContent] = useState("");
+  const { user, isLoaded } = useUser(); // Destructure isLoaded to check if user is ready
 
-  const { user } = useUser();
+  // Log the user data from Clerk once it's loaded
+  useEffect(() => {
+    if (isLoaded) {
+      console.log("User from Clerk:", user); // This log should appear in your browser console
+    }
+  }, [isLoaded, user]);
+
   const handlePostSubmit = async () => {
     if (!user) {
       alert("Please log in to post.");
       return;
     }
 
-    // Fetch user from Supabase using Clerk ID
-    const { data: userData, error } = await supabase
-      .from("users")
-      .select("id")
-      .eq("clerk_id", user.id)
-      .single();
+    console.log("Fetching user data from Supabase using Clerk ID:", user.id);
 
-    if (error || !userData) {
-      console.error("User not found in Supabase:", error);
-      alert("User not linked in Supabase.");
-      return;
-    }
+    try {
+      // Fetch user from Supabase using Clerk ID
+      const { data: userData, error } = await supabase
+        .from("users")
+        .select("id")
+        .eq("clerk_id", user.id);
 
-    // Insert Post
-    const { error: postError } = await supabase.from("posts").insert({
-      content,
-      user_id: userData.id,
-    });
+      // Log the raw response from Supabase
+      console.log("Fetched userData from Supabase:", userData);
 
-    if (postError) {
-      console.error("Error submitting post:", postError);
-      alert("Failed to submit post.");
-    } else {
-      alert("Post submitted!");
-      setContent(""); // Reset form
+      if (error) {
+        console.error("Error fetching user from Supabase:", error.message);
+        alert("There was an error fetching your user data from Supabase.");
+        return;
+      }
+
+      if (!userData || userData.length === 0) {
+        console.error("User not found in Supabase.");
+        alert("User not linked in Supabase.");
+        // If user doesn't exist, insert into Supabase
+        const { error: insertError } = await supabase.from("users").insert([
+          {
+            clerk_id: user.id,
+            username: user.username || "Anonymous", // Use the username from Clerk or default
+          },
+        ]);
+
+        if (insertError) {
+          console.error(
+            "Error inserting user into Supabase:",
+            insertError.message
+          );
+          alert("Failed to link your user to Supabase.");
+          return;
+        }
+
+        console.log("User successfully inserted into Supabase!");
+      }
+
+      // Re-fetch the user data to get the proper user ID after insertion
+      const { data: reFetchedUserData } = await supabase
+        .from("users")
+        .select("id")
+        .eq("clerk_id", user.id);
+
+      if (!reFetchedUserData || reFetchedUserData.length === 0) {
+        console.error("Failed to link user to Supabase.");
+        alert("Failed to link your user to Supabase.");
+        return;
+      }
+
+      // Get user id (ensure we have exactly one result)
+      const userId = reFetchedUserData[0].id;
+      console.log("User ID from Supabase:", userId);
+
+      // Insert Post into Supabase
+      const { error: postError } = await supabase.from("posts").insert({
+        content,
+        user_id: userId,
+      });
+
+      // Log any post submission errors
+      if (postError) {
+        console.error("Error submitting post:", postError.message);
+        alert("Failed to submit post.");
+      } else {
+        console.log("Post submitted successfully!");
+        alert("Post submitted!");
+        setContent(""); // Reset form
+      }
+    } catch (error) {
+      console.error("An unexpected error occurred:", error);
+      alert("Something went wrong. Please try again later.");
     }
   };
+
+  // If the user is not loaded yet, return a loading state
+  if (!isLoaded) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <div>
