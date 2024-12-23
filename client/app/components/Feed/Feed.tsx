@@ -1,5 +1,3 @@
-
-
 // import { useState, useEffect } from "react";
 // import { useUser } from "@clerk/nextjs";
 // import { createClient } from "@supabase/supabase-js";
@@ -9,7 +7,7 @@
 //   ChatBubbleLeftEllipsisIcon,
 //   ShareIcon,
 // } from "@heroicons/react/24/outline";
-// import { formatDistanceToNow } from "date-fns"; 
+// import { formatDistanceToNow } from "date-fns";
 
 // // Supabase Client
 // const supabase = createClient(
@@ -203,17 +201,11 @@
 //     </div>
 //   );
 // }
+
 import { useState, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
 import { createClient } from "@supabase/supabase-js";
-import {
-  HeartIcon,
-  ChatBubbleLeftEllipsisIcon,
-  ShareIcon,
-} from "@heroicons/react/24/outline";
-import { formatDistanceToNow } from "date-fns";
 
-// Initialize Supabase client
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -221,54 +213,53 @@ const supabase = createClient(
 
 export default function Feed() {
   const [content, setContent] = useState("");
-  const [image, setImage] = useState<File | null>(null); // For storing the selected image
-  const [posts, setPosts] = useState<any[]>([]); // For storing posts
+  const [posts, setPosts] = useState<any[]>([]);
   const { user, isLoaded } = useUser();
 
-  // Fetch posts from Supabase
   const fetchPosts = async () => {
-    const { data, error } = await supabase
-      .from("posts")
-      .select("*, user:id, comments(*), likes(*)")
-      .order("created_at", { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from("posts")
+        .select(
+          `
+          id,
+          content,
+          created_at,
+          user_id,
+          comments (
+            id,
+            content,
+            user_id,
+            created_at
+          ),
+          likes (
+            id,
+            user_id
+          )
+        `
+        )
+        .order("created_at", { ascending: false });
 
-    if (error) {
-      console.error("Error fetching posts:", error.message);
-      return;
+      if (error) {
+        console.error("Error fetching posts:", error.message);
+        return;
+      }
+
+      setPosts(data); 
+    } catch (error) {
+      console.error("An error occurred while fetching posts:", error);
     }
-
-    setPosts(data);
   };
 
-  // Upload image to Supabase Storage
-  const uploadImage = async (file: File) => {
-    const fileName = `${Date.now()}_${file.name}`;
-    const { data, error } = await supabase.storage
-      .from("post_images") // Your storage bucket
-      .upload(fileName, file);
-
-    if (error) {
-      console.error("Error uploading image:", error.message);
-      return null;
+  useEffect(() => {
+    if (isLoaded && user) {
+      fetchPosts();
     }
+  }, [isLoaded, user]);
 
-    // Get the public URL for the uploaded file
-    const imageUrl = supabase.storage
-      .from("post_images")
-      .getPublicUrl(fileName).data.publicUrl;
-
-    return imageUrl;
-  };
-
-  // Handle post submission
   const handlePostSubmit = async () => {
     if (!user) {
       alert("Please log in to post.");
-      return;
-    }
-
-    if (!content.trim() && !image) {
-      alert("Please enter content or upload an image.");
       return;
     }
 
@@ -276,196 +267,128 @@ export default function Feed() {
       const { data: userData, error } = await supabase
         .from("users")
         .select("id")
-        .eq("clerk_id", user.id);
+        .eq("clerk_id", user.id)
+        .single();
 
-      if (error) {
-        console.error("Error fetching user from Supabase:", error.message);
-        alert("There was an error fetching your user data from Supabase.");
+      if (error || !userData) {
+        console.error("Error fetching user data from Supabase:", error.message);
         return;
       }
 
-      if (!userData || userData.length === 0) {
-        const { error: insertError } = await supabase.from("users").insert([
-          {
-            clerk_id: user.id,
-            username: user.username || "Anonymous",
-          },
-        ]);
-
-        if (insertError) {
-          console.error(
-            "Error inserting user into Supabase:",
-            insertError.message
-          );
-          alert("Failed to link your user to Supabase.");
-          return;
-        }
-      }
-
-      const { data: reFetchedUserData } = await supabase
-        .from("users")
-        .select("id")
-        .eq("clerk_id", user.id);
-
-      const userId = reFetchedUserData && reFetchedUserData[0]?.id;
-      if (!userId) {
-        alert("User not found.");
-        return;
-      }
-
-      let imageUrl: string | null = null;
-      if (image) {
-        imageUrl = await uploadImage(image);
-      }
-
+      const userId = userData.id;
       const { error: postError } = await supabase.from("posts").insert({
         content,
-        image_url: imageUrl,
         user_id: userId,
       });
 
       if (postError) {
         console.error("Error submitting post:", postError.message);
-        alert("Failed to submit post.");
-      } else {
-        console.log("Post submitted successfully!");
-        alert("Post submitted!");
-        setContent("");
-        setImage(null); // Reset image after submitting
-        fetchPosts(); // Fetch latest posts
+        return;
       }
+
+      setContent(""); 
+      fetchPosts(); 
     } catch (error) {
-      console.error("An unexpected error occurred:", error);
-      alert("Something went wrong. Please try again later.");
+      console.error("Error creating post:", error);
     }
   };
 
-  // Real-time listener for new posts
-  useEffect(() => {
-    fetchPosts(); // Initial fetch of posts
+  const handleLike = async (postId: string) => {
+    if (!user) return alert("Please log in to like posts.");
 
-    // Listen for real-time changes to posts
-    const postSubscription = supabase
-      .channel('public:posts')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, (payload: { new: any }) => {
-        setPosts((prevPosts) => [payload.new, ...prevPosts]);
-      })
-      .subscribe();
+    try {
+      const { data: userData, error } = await supabase
+        .from("users")
+        .select("id")
+        .eq("clerk_id", user.id)
+        .single();
 
-    return () => {
-      supabase.removeChannel(postSubscription);
-    };
-  }, []);
+      if (error || !userData) {
+        console.error("Error fetching user data from Supabase:", error.message);
+        return;
+      }
 
-  // Render loading message if user data is not loaded
+      const userId = userData.id;
+      const { error: likeError } = await supabase
+        .from("likes")
+        .upsert([{ post_id: postId, user_id: userId }]);
+
+      if (likeError) {
+        console.error("Error liking post:", likeError.message);
+      } else {
+        fetchPosts();
+      }
+    } catch (error) {
+      console.error("Error liking post:", error);
+    }
+  };
+
+  const handleComment = async (postId: string, commentContent: string) => {
+    if (!user) return alert("Please log in to comment.");
+
+    try {
+      const { data: userData, error } = await supabase
+        .from("users")
+        .select("id")
+        .eq("clerk_id", user.id)
+        .single();
+
+      if (error || !userData) {
+        console.error("Error fetching user data from Supabase:", error.message);
+        return;
+      }
+
+      const userId = userData.id;
+      const { error: commentError } = await supabase.from("comments").insert({
+        content: commentContent,
+        post_id: postId,
+        user_id: userId,
+      });
+
+      if (commentError) {
+        console.error("Error commenting on post:", commentError.message);
+      } else {
+        fetchPosts(); 
+      }
+    } catch (error) {
+      console.error("Error commenting on post:", error);
+    }
+  };
+
   if (!isLoaded) {
     return <div>Loading...</div>;
   }
 
   return (
-    <div className="max-w-3xl mx-auto p-4">
-      {/* Post Submission Form */}
+    <div>
       <textarea
         value={content}
         onChange={(e) => setContent(e.target.value)}
         placeholder="Type your message..."
-        className="w-full p-4 border border-gray-300 rounded-lg shadow-md resize-none"
       />
-      <div className="mt-4">
-        <label
-          htmlFor="image-upload"
-          className="cursor-pointer text-blue-600 hover:text-blue-800"
-        >
-          Upload an image
-        </label>
-        <input
-          type="file"
-          id="image-upload"
-          onChange={(e) => setImage(e.target.files ? e.target.files[0] : null)}
-          className="ml-4"
-        />
-      </div>
-      <button
-        onClick={handlePostSubmit}
-        className="mt-4 bg-blue-600 text-white p-2 rounded-lg w-full hover:bg-blue-800 transition-all"
-      >
-        Post
-      </button>
+      <button onClick={handlePostSubmit}>Post</button>
 
-      {/* Feed (Display live posts) */}
-      <div className="mt-8">
-        {posts.map((post) => (
-          <div
-            key={post.id}
-            className="mb-6 p-4 bg-gray-50 rounded-lg shadow-md hover:shadow-xl transition-all"
-          >
-            <div className="flex items-center mb-4">
-              <img
-                src={post.user.profileImageUrl || "/default-avatar.png"}
-                alt="Profile"
-                className="w-10 h-10 rounded-full mr-4"
-              />
-              <div className="flex-1">
-                <p className="font-semibold text-gray-700">
-                  {post.user.username || "Anonymous"}
-                </p>
-                <p className="text-sm text-gray-500">
-                  {formatDistanceToNow(new Date(post.created_at))} ago
-                </p>
+      {posts.map((post) => (
+        <div key={post.id}>
+          <p>{post.content}</p>
+          <button onClick={() => handleLike(post.id)}>
+            Like ({post.likes.length})
+          </button>
+
+          <div>
+            {post.comments.map((comment: { id: string; content: string }) => (
+              <div key={comment.id}>
+                <p>{comment.content}</p>
               </div>
-            </div>
+            ))}
 
-            <p className="text-gray-800">{post.content}</p>
-
-            {post.image_url && (
-              <img
-                src={post.image_url}
-                alt="Post image"
-                className="w-full h-auto rounded-lg mt-4"
-              />
-            )}
-
-            <div className="flex justify-start space-x-4 mt-4">
-              <button className="flex items-center text-gray-600 hover:text-red-600">
-                <HeartIcon className="w-5 h-5 mr-2" />
-                {post.likes_count || 0} Likes
-              </button>
-              <button className="flex items-center text-gray-600 hover:text-blue-600">
-                <ChatBubbleLeftEllipsisIcon className="w-5 h-5 mr-2" />
-                {post.comments.length} Comments
-              </button>
-              <button className="flex items-center text-gray-600 hover:text-green-600">
-                <ShareIcon className="w-5 h-5 mr-2" />
-                Share
-              </button>
-            </div>
-
-            {/* Comment Section */}
-            <div className="mt-4">
-              {post.comments.map((comment: any) => (
-                <div
-                  key={comment.id}
-                  className="mb-4 p-4 bg-gray-100 rounded-lg"
-                >
-                  <div className="flex items-center">
-                    <img
-                      src={
-                        comment.user.profileImageUrl || "/default-avatar.png"
-                      }
-                      alt="Profile"
-                      className="w-8 h-8 rounded-full mr-3"
-                    />
-                    <p className="text-sm text-gray-700 font-semibold">
-                      {comment.user.username || "Anonymous"}
-                    </p>
-                  </div>
-                  <p className="text-gray-700 mt-2">{comment.content}</p>
-                </div>
-              ))}
-            </div>
+            <textarea
+              placeholder="Add a comment..."
+              onBlur={(e) => handleComment(post.id, e.target.value)}
+            />
           </div>
-        ))}
-      </div>
+        </div>
+      ))}
     </div>
   );
 }
