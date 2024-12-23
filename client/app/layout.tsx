@@ -1,8 +1,8 @@
-import type { Metadata } from "next";
+
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import ResponsiveNav from "./components/Header/Responsivenav";
 import { ClerkProvider } from "@clerk/nextjs";
+import ClientProviders from "./providers";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,27 +14,25 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
+export const metadata = {
   title: "Learnopoly",
   description: "Learnopoly - Learn, Collaborate, and Grow",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <ClerkProvider>
-      <html lang="en">
-        <head>
-          <link rel="icon" href="/favicon.ico" />
-        </head>
-        <body className={`${geistSans.variable} ${geistMono.variable}`}>
-          <ResponsiveNav />
-          <main>{children}</main>
-        </body>
-      </html>
-    </ClerkProvider>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+      <body>
+        <ClerkProvider>
+          <ClientProviders>
+            {children}
+          </ClientProviders>
+        </ClerkProvider>
+      </body>
+    </html>
   );
 }

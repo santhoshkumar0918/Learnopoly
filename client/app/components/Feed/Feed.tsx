@@ -135,14 +135,13 @@
 
 
 // app/feed/Feed.tsx
-"use client"; // Ensure this component is client-side
+"use client";
 
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useUser } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 
-// Function to fetch posts from the database
 async function fetchPosts() {
   const { data, error } = await supabase
     .from("posts")
@@ -153,14 +152,12 @@ async function fetchPosts() {
   return data;
 }
 
-// Feed Component - Handles the UI for displaying posts and posting new ones
 export default function Feed() {
   const queryClient = useQueryClient();
-  const { user, isLoaded } = useUser(); // Use Clerk's user hook (client-side only)
+  const { user, isLoaded } = useUser();
   const [content, setContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Fetch posts using react-query
   const {
     data: posts,
     isLoading,
@@ -169,10 +166,9 @@ export default function Feed() {
   } = useQuery({
     queryKey: ["posts"],
     queryFn: fetchPosts,
-    staleTime: 1000 * 60 * 5, // Cache data for 5 minutes
-  });
-
-  // UseEffect to listen for new posts via Supabase real-time changes
+    staleTime: 1000 * 60 * 5, 
+  }
+  );
   useEffect(() => {
     const subscription = supabase
       .channel("public:posts")
@@ -193,7 +189,6 @@ export default function Feed() {
     };
   }, [queryClient]);
 
-  // Handle form submission to create a new post
   const handlePostSubmit = async () => {
     if (!content) return;
     setIsSubmitting(true);
@@ -212,7 +207,6 @@ export default function Feed() {
     setIsSubmitting(false);
   };
 
-  // Loading state while posts are being fetched
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -226,7 +220,6 @@ export default function Feed() {
     );
   }
 
-  // Error state if fetching posts fails
   if (isError) {
     return (
       <div className="text-red-500 p-4">
@@ -235,7 +228,6 @@ export default function Feed() {
     );
   }
 
-  // Render feed
   return (
     <div className="space-y-4">
       {isLoaded && user ? (
