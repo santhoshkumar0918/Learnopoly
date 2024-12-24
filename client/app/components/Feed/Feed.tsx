@@ -417,16 +417,14 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import {Card,CardContent,CardFooter,CardHeader} from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
-// Initialize Supabase client
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// TypeScript Interfaces
 interface User {
   id: string;
   fullName: string;
@@ -468,7 +466,6 @@ interface CreateCommentInput {
 }
 
 export default function Feed() {
-  // State management
   const [content, setContent] = useState("");
   const [commentContent, setCommentContent] = useState<Record<string, string>>({});
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
@@ -477,12 +474,12 @@ export default function Feed() {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Refs and hooks
+  
   const imageInputRef = useRef<HTMLInputElement>(null);
   const { user, isLoaded } = useUser();
   const queryClient = useQueryClient();
 
-  // Fetch posts query
+  
   const { data: posts, isLoading: isLoadingPosts, error: postsError } = useQuery({
     queryKey: ['posts'],
     queryFn: async () => {
@@ -501,7 +498,7 @@ export default function Feed() {
     }
   });
 
-  // Create post mutation
+  
   const createPost = useMutation({
     mutationFn: async (input: CreatePostInput) => {
       const { data, error } = await supabase
@@ -525,7 +522,7 @@ export default function Feed() {
     }
   });
 
-  // Toggle like mutation with optimistic updates
+
   const toggleLike = useMutation({
     mutationFn: async (postId: string) => {
       const existingLike = posts?.find(p => p.id === postId)?.likes.find(l => l.user_id === user?.id);
@@ -575,7 +572,6 @@ export default function Feed() {
     }
   });
 
-  // Add comment mutation
   const addComment = useMutation({
     mutationFn: async ({ postId, content }: CreateCommentInput) => {
       const { data, error } = await supabase
@@ -595,7 +591,6 @@ export default function Feed() {
     }
   });
 
-  // Image handling
   const handleImageSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -632,7 +627,6 @@ export default function Feed() {
     }
   };
 
-  // UI Components
   const PostSkeleton = () => (
     <Card className="animate-pulse">
       <CardHeader className="flex flex-row items-center gap-4">
