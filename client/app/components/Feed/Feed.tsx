@@ -1,7 +1,20 @@
-// import { useState } from "react";
+
+
+// "use client";
+
+// import { useState, useRef } from "react";
 // import { useUser } from "@clerk/nextjs";
 // import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 // import { createClient } from "@supabase/supabase-js";
+// import {
+//   HeartIcon as HeartOutline,
+//   ChatBubbleOvalLeftEllipsisIcon,
+//   ShareIcon,
+//   TrashIcon,
+//   PhotoIcon,
+//   XMarkIcon,
+// } from "@heroicons/react/24/outline";
+// import { HeartIcon as HeartSolid } from "@heroicons/react/24/solid";
 
 // const supabase = createClient(
 //   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -13,6 +26,7 @@
 //   content: string;
 //   created_at: string;
 //   user_id: string;
+//   image_url?: string;
 //   comments: Comment[];
 //   likes: Like[];
 // }
@@ -34,6 +48,10 @@
 //   const [commentContent, setCommentContent] = useState<Record<string, string>>(
 //     {}
 //   );
+//   const [selectedImage, setSelectedImage] = useState<File | null>(null);
+//   const [imagePreview, setImagePreview] = useState<string | null>(null);
+//   const [showComments, setShowComments] = useState<Record<string, boolean>>({});
+//   const imageInputRef = useRef<HTMLInputElement>(null);
 //   const { user, isLoaded } = useUser();
 //   const queryClient = useQueryClient();
 
@@ -44,53 +62,91 @@
 //         .from("posts")
 //         .select(
 //           `
-//           id,
-//           content,
-//           created_at,
-//           user_id,
-//           comments (
-//             id,
-//             content,
-//             user_id,
-//             created_at
-//           ),
-//           likes (
-//             id,
-//             user_id
-//           )
+//           id, content, created_at, user_id, image_url,
+//           comments(id, content, user_id, created_at),
+//           likes(id, user_id)
 //         `
 //         )
 //         .order("created_at", { ascending: false });
-
 //       if (error) throw error;
 //       return data as Post[];
 //     },
 //     enabled: isLoaded && !!user,
 //   });
 
+//   const uploadImage = async (file: File) => {
+//     const fileExt = file.name.split(".").pop();
+//     const fileName = `${Math.random()}.${fileExt}`;
+//     const { error: uploadError } = await supabase.storage
+//       .from("post-images")
+//       .upload(fileName, file);
+//     if (uploadError) throw uploadError;
+//     return fileName;
+//   };
+
 //   const createPost = useMutation({
 //     mutationFn: async () => {
-//       const { data: userData, error: userError } = await supabase
+//       if (!user) throw new Error("User not authenticated");
+
+//       const { data: userData } = await supabase
 //         .from("users")
 //         .select("id")
-//         .eq("clerk_id", user!.id)
+//         .eq("clerk_id", user.id)
 //         .single();
 
-//       if (userError) throw userError;
+//       let imagePath = null;
+//       if (selectedImage) {
+//         imagePath = await uploadImage(selectedImage);
+//       }
 
-//       const { error: postError } = await supabase
-//         .from("posts")
-//         .insert({ content, user_id: userData.id });
+//       const { error } = await supabase.from("posts").insert({
+//         content,
+//         user_id: userData?.id,
+//         image_url: imagePath,
+//       });
 
-//       if (postError) throw postError;
+//       if (error) throw error;
 //     },
 //     onSuccess: () => {
 //       queryClient.invalidateQueries({ queryKey: ["posts"] });
 //       setContent("");
+//       setSelectedImage(null);
+//       setImagePreview(null);
 //     },
 //   });
 
-//   const createComment = useMutation({
+//   const toggleLike = useMutation({
+//     mutationFn: async (postId: string) => {
+//       if (!user) throw new Error("User not authenticated");
+
+//       const { data: userData } = await supabase
+//         .from("users")
+//         .select("id")
+//         .eq("clerk_id", user.id)
+//         .single();
+
+//       const { data: existingLike } = await supabase
+//         .from("likes")
+//         .select("*")
+//         .eq("post_id", postId)
+//         .eq("user_id", userData?.id)
+//         .single();
+
+//       if (existingLike) {
+//         await supabase.from("likes").delete().eq("id", existingLike.id);
+//       } else {
+//         await supabase.from("likes").insert({
+//           post_id: postId,
+//           user_id: userData?.id,
+//         });
+//       }
+//     },
+//     onSuccess: () => {
+//       queryClient.invalidateQueries({ queryKey: ["posts"] });
+//     },
+//   });
+
+//   const addComment = useMutation({
 //     mutationFn: async ({
 //       postId,
 //       content,
@@ -98,19 +154,21 @@
 //       postId: string;
 //       content: string;
 //     }) => {
-//       const { data: userData, error: userError } = await supabase
+//       if (!user) throw new Error("User not authenticated");
+
+//       const { data: userData } = await supabase
 //         .from("users")
 //         .select("id")
-//         .eq("clerk_id", user!.id)
+//         .eq("clerk_id", user.id)
 //         .single();
 
-//       if (userError) throw userError;
+//       const { error } = await supabase.from("comments").insert({
+//         content,
+//         post_id: postId,
+//         user_id: userData?.id,
+//       });
 
-//       const { error: commentError } = await supabase
-//         .from("comments")
-//         .insert({ content, post_id: postId, user_id: userData.id });
-
-//       if (commentError) throw commentError;
+//       if (error) throw error;
 //     },
 //     onSuccess: () => {
 //       queryClient.invalidateQueries({ queryKey: ["posts"] });
@@ -118,77 +176,86 @@
 //     },
 //   });
 
-//   const toggleLike = useMutation({
-//     mutationFn: async (postId: string) => {
-//       const { data: userData, error: userError } = await supabase
-//         .from("users")
-//         .select("id")
-//         .eq("clerk_id", user!.id)
-//         .single();
+//   const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+//     const file = event.target.files?.[0];
+//     if (file) {
+//       setSelectedImage(file);
+//       const reader = new FileReader();
+//       reader.onloadend = () => setImagePreview(reader.result as string);
+//       reader.readAsDataURL(file);
+//     }
+//   };
 
-//       if (userError) throw userError;
-
-//       const { error: likeError } = await supabase
-//         .from("likes")
-//         .upsert([{ post_id: postId, user_id: userData.id }]);
-
-//       if (likeError) throw likeError;
-//     },
-//     onSuccess: () => {
-//       queryClient.invalidateQueries({ queryKey: ["posts"] });
-//     },
-//   });
-
-//   if (!isLoaded) {
-//     return (
-//       <div className="flex justify-center items-center min-h-screen">
-//         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-//       </div>
-//     );
-//   }
+//   const handleShare = async (post: Post) => {
+//     try {
+//       await navigator.share({
+//         title: "Check out this post!",
+//         text: post.content,
+//         url: window.location.href,
+//       });
+//     } catch (error) {
+//       console.error("Error sharing:", error);
+//     }
+//   };
 
 //   return (
-//     <div className="min-h-screen bg-gray-50">
-//       <div className="max-w-2xl mx-auto p-4 space-y-6">
-//         {/* Create Post Card */}
-//         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-//           <div className="flex items-start space-x-4">
+//     <div className="min-h-screen bg-gray-900 text-white">
+//       <div className="max-w-2xl mx-auto px-4 py-6">
+//         {/* Create Post */}
+//         <div className="bg-gray-800 rounded-xl p-4 mb-6">
+//           <div className="flex items-start space-x-3">
 //             <img
-//               src={user?.imageUrl || "/api/placeholder/32/32"}
+//               src={user?.imageUrl}
 //               alt="Profile"
 //               className="w-10 h-10 rounded-full"
 //             />
-//             <div className="flex-1">
+//             <div className="flex-1 space-y-3">
 //               <textarea
 //                 value={content}
 //                 onChange={(e) => setContent(e.target.value)}
-//                 placeholder="What's on your mind?"
-//                 className="w-full p-3 border border-gray-200 text-black rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px] bg-gray-50"
+//                 placeholder="What's happening?"
+//                 className="w-full bg-gray-700 rounded-lg p-3 text-white placeholder-gray-400 border-none resize-none focus:ring-2 focus:ring-blue-500 min-h-[100px]"
 //               />
-//               <div className="mt-3 flex justify-end">
+//               {imagePreview && (
+//                 <div className="relative rounded-lg overflow-hidden">
+//                   <img
+//                     src={imagePreview}
+//                     alt="Preview"
+//                     className="max-h-96 w-full object-cover"
+//                   />
+//                   <button
+//                     onClick={() => {
+//                       setImagePreview(null);
+//                       setSelectedImage(null);
+//                     }}
+//                     className="absolute top-2 right-2 p-1 bg-gray-900 rounded-full hover:bg-gray-800"
+//                   >
+//                     <XMarkIcon className="w-5 h-5" />
+//                   </button>
+//                 </div>
+//               )}
+//               <div className="flex items-center justify-between">
+//                 <input
+//                   type="file"
+//                   accept="image/*"
+//                   ref={imageInputRef}
+//                   className="hidden"
+//                   onChange={handleImageSelect}
+//                 />
+//                 <button
+//                   onClick={() => imageInputRef.current?.click()}
+//                   className="p-2 hover:bg-gray-700 rounded-full transition-colors"
+//                 >
+//                   <PhotoIcon className="w-6 h-6 text-blue-400" />
+//                 </button>
 //                 <button
 //                   onClick={() => createPost.mutate()}
-//                   disabled={!content.trim() || createPost.isPending}
-//                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+//                   disabled={
+//                     (!content.trim() && !selectedImage) || createPost.isPending
+//                   }
+//                   className="bg-blue-500 px-6 py-2 rounded-full font-semibold hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
 //                 >
-//                   {createPost.isPending ? (
-//                     <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
-//                   ) : (
-//                     <svg
-//                       className="h-4 w-4 mr-2"
-//                       fill="none"
-//                       stroke="currentColor"
-//                       viewBox="0 0 24 24"
-//                     >
-//                       <path
-//                         strokeLinecap="round"
-//                         strokeLinejoin="round"
-//                         strokeWidth={2}
-//                         d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-//                       />
-//                     </svg>
-//                   )}
-//                   Post
+//                   {createPost.isPending ? "Posting..." : "Post"}
 //                 </button>
 //               </div>
 //             </div>
@@ -196,136 +263,94 @@
 //         </div>
 
 //         {/* Posts Feed */}
-//         {isLoading ? (
-//           <div className="space-y-4">
-//             {[...Array(3)].map((_, i) => (
-//               <div
-//                 key={i}
-//                 className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 animate-pulse"
-//               >
-//                 <div className="flex items-center space-x-4">
-//                   <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
-//                   <div className="flex-1">
-//                     <div className="h-4 bg-gray-200 rounded w-1/4 mb-2"></div>
-//                     <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-//                   </div>
-//                 </div>
-//               </div>
-//             ))}
-//           </div>
-//         ) : (
-//           <div className="space-y-6">
-//             {posts?.map((post) => (
-//               <div
-//                 key={post.id}
-//                 className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"
-//               >
-//                 {/* Post Header */}
-//                 <div className="p-4 border-b border-gray-100">
-//                   <div className="flex items-center space-x-3">
-//                     <img
-//                       src="/api/placeholder/32/32"
-//                       alt="User"
-//                       className="w-10 h-10 rounded-full bg-gray-200"
-//                     />
-//                     <div>
-//                       <p className="font-medium text-gray-900">User</p>
-//                       <p className="text-sm text-gray-500">
-//                         {new Date(post.created_at).toLocaleDateString(
-//                           undefined,
-//                           {
-//                             month: "short",
-//                             day: "numeric",
-//                             hour: "2-digit",
-//                             minute: "2-digit",
-//                           }
-//                         )}
-//                       </p>
-//                     </div>
-//                   </div>
-//                 </div>
-
-//                 {/* Post Content */}
-//                 <div className="p-4">
-//                   <p className="text-gray-900 whitespace-pre-wrap">
-//                     {post.content}
+//         <div className="space-y-6">
+//           {posts?.map((post) => (
+//             <div
+//               key={post.id}
+//               className="bg-gray-800 rounded-xl p-4 space-y-4 hover:bg-gray-750 transition-colors"
+//             >
+//               <div className="flex items-center space-x-3">
+//                 <img
+//                   src={user?.imageUrl}
+//                   alt="Profile"
+//                   className="w-10 h-10 rounded-full"
+//                 />
+//                 <div>
+//                   <p className="font-semibold">{user?.fullName}</p>
+//                   <p className="text-sm text-gray-400">
+//                     {new Date(post.created_at).toLocaleDateString(undefined, {
+//                       month: "short",
+//                       day: "numeric",
+//                     })}
 //                   </p>
 //                 </div>
+//               </div>
 
-//                 {/* Post Actions */}
-//                 <div className="flex items-center px-4 py-3 border-t border-gray-100">
-//                   <button
-//                     onClick={() => toggleLike.mutate(post.id)}
-//                     className={`flex items-center space-x-2 ${
-//                       post.likes.some((like) => like.user_id === user?.id)
-//                         ? "text-red-500"
-//                         : "text-gray-500 hover:text-red-500"
-//                     } transition-colors`}
-//                   >
-//                     <svg
-//                       className={`h-6 w-6 ${
-//                         post.likes.some((like) => like.user_id === user?.id)
-//                           ? "fill-current"
-//                           : "stroke-2"
-//                       }`}
-//                       fill="none"
-//                       viewBox="0 0 24 24"
-//                       stroke="currentColor"
-//                     >
-//                       <path
-//                         strokeLinecap="round"
-//                         strokeLinejoin="round"
-//                         d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z"
-//                       />
-//                     </svg>
-//                     <span>{post.likes.length}</span>
-//                   </button>
+//               <p className="text-lg">{post.content}</p>
 
-//                   <div className="flex items-center space-x-2 ml-6 text-gray-500">
-//                     <svg
-//                       className="h-6 w-6"
-//                       fill="none"
-//                       viewBox="0 0 24 24"
-//                       stroke="currentColor"
-//                     >
-//                       <path
-//                         strokeLinecap="round"
-//                         strokeLinejoin="round"
-//                         strokeWidth={2}
-//                         d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-//                       />
-//                     </svg>
-//                     <span>{post.comments.length}</span>
-//                   </div>
-//                 </div>
+//               {post.image_url && (
+//                 <img
+//                   src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/post-images/${post.image_url}`}
+//                   alt="Post"
+//                   className="rounded-xl max-h-96 w-full object-cover"
+//                 />
+//               )}
 
-//                 {/* Comments Section */}
-//                 <div className="bg-gray-50 p-4 space-y-4">
+//               <div className="flex items-center space-x-6 pt-2">
+//                 <button
+//                   onClick={() => toggleLike.mutate(post.id)}
+//                   className="flex items-center space-x-2 group"
+//                 >
+//                   {post.likes.some((like) => like.user_id === user?.id) ? (
+//                     <HeartSolid className="w-6 h-6 text-pink-500" />
+//                   ) : (
+//                     <HeartOutline className="w-6 h-6 text-gray-400 group-hover:text-pink-500 transition-colors" />
+//                   )}
+//                   <span className="text-sm text-gray-400 group-hover:text-pink-500">
+//                     {post.likes.length}
+//                   </span>
+//                 </button>
+
+//                 <button
+//                   onClick={() =>
+//                     setShowComments({
+//                       ...showComments,
+//                       [post.id]: !showComments[post.id],
+//                     })
+//                   }
+//                   className="flex items-center space-x-2 group"
+//                 >
+//                   <ChatBubbleOvalLeftEllipsisIcon className="w-6 h-6 text-gray-400 group-hover:text-blue-500" />
+//                   <span className="text-sm text-gray-400 group-hover:text-blue-500">
+//                     {post.comments.length}
+//                   </span>
+//                 </button>
+
+//                 <button
+//                   onClick={() => handleShare(post)}
+//                   className="flex items-center space-x-2 group"
+//                 >
+//                   <ShareIcon className="w-6 h-6 text-gray-400 group-hover:text-green-500" />
+//                 </button>
+//               </div>
+
+//               {showComments[post.id] && (
+//                 <div className="space-y-4 mt-4 border-t border-gray-700 pt-4">
 //                   {post.comments.map((comment) => (
-//                     <div
-//                       key={comment.id}
-//                       className="flex items-start space-x-3"
-//                     >
+//                     <div key={comment.id} className="flex space-x-3">
 //                       <img
-//                         src="/api/placeholder/24/24"
-//                         alt="Commenter"
-//                         className="w-8 h-8 rounded-full bg-gray-200"
+//                         src={user?.imageUrl}
+//                         alt="Profile"
+//                         className="w-8 h-8 rounded-full"
 //                       />
-//                       <div className="flex-1 bg-white rounded-lg p-3 shadow-sm">
-//                         <p className="text-sm text-gray-900">
-//                           {comment.content}
-//                         </p>
-//                         <p className="text-xs text-gray-500 mt-1">
-//                           {new Date(comment.created_at).toLocaleDateString()}
-//                         </p>
+//                       <div className="flex-1 bg-gray-700 rounded-lg p-3">
+//                         <p className="text-sm">{comment.content}</p>
 //                       </div>
 //                     </div>
 //                   ))}
-
-//                   {/* Add Comment */}
-//                   <div className="flex items-start space-x-3 mt-4">
+//                   <div className="flex space-x-3">
 //                     <img
-//                       src={user?.imageUrl || "/api/placeholder/24/24"}
+//                       src={user?.imageUrl}
 //                       alt="Profile"
 //                       className="w-8 h-8 rounded-full"
 //                     />
@@ -334,18 +359,18 @@
 //                         type="text"
 //                         value={commentContent[post.id] || ""}
 //                         onChange={(e) =>
-//                           setCommentContent((prev) => ({
-//                             ...prev,
+//                           setCommentContent({
+//                             ...commentContent,
 //                             [post.id]: e.target.value,
-//                           }))
+//                           })
 //                         }
-//                         placeholder="Write a comment..."
-//                         className="w-full px-4 py-2 text-black border border-gray-200 rounded-full bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 pr-12"
+//                         placeholder="Add a comment..."
+//                         className="w-full bg-gray-700 rounded-full py-2 px-4 pr-12 focus:outline-none focus:ring-2 focus:ring-blue-500"
 //                       />
 //                       <button
 //                         onClick={() => {
 //                           if (commentContent[post.id]?.trim()) {
-//                             createComment.mutate({
+//                             addComment.mutate({
 //                               postId: post.id,
 //                               content: commentContent[post.id],
 //                             });
@@ -353,12 +378,12 @@
 //                         }}
 //                         disabled={
 //                           !commentContent[post.id]?.trim() ||
-//                           createComment.isPending
+//                           addComment.isPending
 //                         }
-//                         className="absolute right-2 top-1/2 -translate-y-1/2 text-blue-500 hover:text-blue-600 disabled:opacity-50"
+//                         className="absolute right-2 top-1/2 -translate-y-1/2 text-blue-500 hover:text-blue-400"
 //                       >
 //                         <svg
-//                           className="h-6 w-6"
+//                           className="w-5 h-5"
 //                           fill="none"
 //                           viewBox="0 0 24 24"
 //                           stroke="currentColor"
@@ -374,36 +399,39 @@
 //                     </div>
 //                   </div>
 //                 </div>
-//               </div>
-//             ))}
-//           </div>
-//         )}
+//               )}
+//             </div>
+//           ))}
+//         </div>
 //       </div>
 //     </div>
 //   );
 // }
 
-
-"use client";
-
-import { useState, useRef } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@supabase/supabase-js";
-import {
-  HeartIcon as HeartOutline,
-  ChatBubbleOvalLeftEllipsisIcon,
-  ShareIcon,
-  TrashIcon,
-  PhotoIcon,
-  XMarkIcon,
-} from "@heroicons/react/24/outline";
-import { HeartIcon as HeartSolid } from "@heroicons/react/24/solid";
+import { Heart, MessageCircle, Share2, Image as ImageIcon, X, Send, MoreHorizontal, Loader2, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
+// Initialize Supabase client
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
+
+// TypeScript Interfaces
+interface User {
+  id: string;
+  fullName: string;
+  imageUrl: string;
+}
 
 interface Post {
   id: string;
@@ -413,6 +441,7 @@ interface Post {
   image_url?: string;
   comments: Comment[];
   likes: Like[];
+  user: User;
 }
 
 interface Comment {
@@ -420,6 +449,7 @@ interface Comment {
   content: string;
   user_id: string;
   created_at: string;
+  user: User;
 }
 
 interface Like {
@@ -427,366 +457,505 @@ interface Like {
   user_id: string;
 }
 
+interface CreatePostInput {
+  content: string;
+  image_url?: string;
+}
+
+interface CreateCommentInput {
+  postId: string;
+  content: string;
+}
+
 export default function Feed() {
+  // State management
   const [content, setContent] = useState("");
-  const [commentContent, setCommentContent] = useState<Record<string, string>>(
-    {}
-  );
+  const [commentContent, setCommentContent] = useState<Record<string, string>>({});
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [showComments, setShowComments] = useState<Record<string, boolean>>({});
+  const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Refs and hooks
   const imageInputRef = useRef<HTMLInputElement>(null);
   const { user, isLoaded } = useUser();
   const queryClient = useQueryClient();
 
-  const { data: posts, isLoading } = useQuery({
-    queryKey: ["posts"],
+  // Fetch posts query
+  const { data: posts, isLoading: isLoadingPosts, error: postsError } = useQuery({
+    queryKey: ['posts'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("posts")
-        .select(
-          `
-          id, content, created_at, user_id, image_url,
-          comments(id, content, user_id, created_at),
-          likes(id, user_id)
-        `
-        )
-        .order("created_at", { ascending: false });
+        .from('posts')
+        .select(`
+          *,
+          user:users(*),
+          comments(*, user:users(*)),
+          likes(*)
+        `)
+        .order('created_at', { ascending: false });
+
       if (error) throw error;
       return data as Post[];
-    },
-    enabled: isLoaded && !!user,
+    }
   });
 
-  const uploadImage = async (file: File) => {
-    const fileExt = file.name.split(".").pop();
-    const fileName = `${Math.random()}.${fileExt}`;
-    const { error: uploadError } = await supabase.storage
-      .from("post-images")
-      .upload(fileName, file);
-    if (uploadError) throw uploadError;
-    return fileName;
-  };
-
+  // Create post mutation
   const createPost = useMutation({
-    mutationFn: async () => {
-      if (!user) throw new Error("User not authenticated");
-
-      const { data: userData } = await supabase
-        .from("users")
-        .select("id")
-        .eq("clerk_id", user.id)
+    mutationFn: async (input: CreatePostInput) => {
+      const { data, error } = await supabase
+        .from('posts')
+        .insert([input])
+        .select()
         .single();
 
-      let imagePath = null;
-      if (selectedImage) {
-        imagePath = await uploadImage(selectedImage);
-      }
-
-      const { error } = await supabase.from("posts").insert({
-        content,
-        user_id: userData?.id,
-        image_url: imagePath,
-      });
-
       if (error) throw error;
+      return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["posts"] });
+      queryClient.invalidateQueries({ queryKey: ['posts'] });
       setContent("");
       setSelectedImage(null);
       setImagePreview(null);
+      setError(null);
     },
+    onError: (error) => {
+      setError("Failed to create post. Please try again.");
+    }
   });
 
+  // Toggle like mutation with optimistic updates
   const toggleLike = useMutation({
     mutationFn: async (postId: string) => {
-      if (!user) throw new Error("User not authenticated");
-
-      const { data: userData } = await supabase
-        .from("users")
-        .select("id")
-        .eq("clerk_id", user.id)
-        .single();
-
-      const { data: existingLike } = await supabase
-        .from("likes")
-        .select("*")
-        .eq("post_id", postId)
-        .eq("user_id", userData?.id)
-        .single();
+      const existingLike = posts?.find(p => p.id === postId)?.likes.find(l => l.user_id === user?.id);
 
       if (existingLike) {
-        await supabase.from("likes").delete().eq("id", existingLike.id);
+        const { error } = await supabase
+          .from('likes')
+          .delete()
+          .match({ id: existingLike.id });
+
+        if (error) throw error;
       } else {
-        await supabase.from("likes").insert({
-          post_id: postId,
-          user_id: userData?.id,
-        });
+        const { error } = await supabase
+          .from('likes')
+          .insert([{ post_id: postId, user_id: user?.id }]);
+
+        if (error) throw error;
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["posts"] });
+    onMutate: async (postId) => {
+      await queryClient.cancelQueries({ queryKey: ['posts'] });
+      const previousPosts = queryClient.getQueryData<Post[]>(['posts']);
+
+      queryClient.setQueryData<Post[]>(['posts'], (old) =>
+        old?.map(post => {
+          if (post.id === postId) {
+            const isLiked = post.likes.some(like => like.user_id === user?.id);
+            return {
+              ...post,
+              likes: isLiked
+                ? post.likes.filter(like => like.user_id !== user?.id)
+                : [...post.likes, { id: 'temp', user_id: user!.id }]
+            };
+          }
+          return post;
+        })
+      );
+
+      return { previousPosts };
     },
+    onError: (err, postId, context) => {
+      queryClient.setQueryData(['posts'], context?.previousPosts);
+      setError("Failed to update like. Please try again.");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['posts'] });
+    }
   });
 
+  // Add comment mutation
   const addComment = useMutation({
-    mutationFn: async ({
-      postId,
-      content,
-    }: {
-      postId: string;
-      content: string;
-    }) => {
-      if (!user) throw new Error("User not authenticated");
-
-      const { data: userData } = await supabase
-        .from("users")
-        .select("id")
-        .eq("clerk_id", user.id)
-        .single();
-
-      const { error } = await supabase.from("comments").insert({
-        content,
-        post_id: postId,
-        user_id: userData?.id,
-      });
+    mutationFn: async ({ postId, content }: CreateCommentInput) => {
+      const { data, error } = await supabase
+        .from('comments')
+        .insert([{ post_id: postId, user_id: user?.id, content }])
+        .select('*, user:users(*)');
 
       if (error) throw error;
+      return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["posts"] });
-      setCommentContent({});
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['posts'] });
+      setCommentContent({ ...commentContent, [variables.postId]: '' });
     },
+    onError: () => {
+      setError("Failed to add comment. Please try again.");
+    }
   });
 
-  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setSelectedImage(file);
-      const reader = new FileReader();
-      reader.onloadend = () => setImagePreview(reader.result as string);
-      reader.readAsDataURL(file);
-    }
-  };
+  // Image handling
+  const handleImageSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  const handleShare = async (post: Post) => {
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Image size must be less than 5MB");
+      return;
+    }
+
+    setSelectedImage(file);
+    setImagePreview(URL.createObjectURL(file));
+  }, []);
+
+  const uploadImage = async (file: File): Promise<string> => {
+    setIsUploading(true);
     try {
-      await navigator.share({
-        title: "Check out this post!",
-        text: post.content,
-        url: window.location.href,
-      });
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random()}.${fileExt}`;
+      const { data, error } = await supabase.storage
+        .from('post-images')
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('post-images')
+        .getPublicUrl(fileName);
+
+      return publicUrl;
     } catch (error) {
-      console.error("Error sharing:", error);
+      throw new Error('Failed to upload image');
+    } finally {
+      setIsUploading(false);
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      <div className="max-w-2xl mx-auto px-4 py-6">
-        {/* Create Post */}
-        <div className="bg-gray-800 rounded-xl p-4 mb-6">
-          <div className="flex items-start space-x-3">
-            <img
-              src={user?.imageUrl}
-              alt="Profile"
-              className="w-10 h-10 rounded-full"
-            />
-            <div className="flex-1 space-y-3">
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="What's happening?"
-                className="w-full bg-gray-700 rounded-lg p-3 text-white placeholder-gray-400 border-none resize-none focus:ring-2 focus:ring-blue-500 min-h-[100px]"
-              />
-              {imagePreview && (
-                <div className="relative rounded-lg overflow-hidden">
-                  <img
-                    src={imagePreview}
-                    alt="Preview"
-                    className="max-h-96 w-full object-cover"
-                  />
-                  <button
-                    onClick={() => {
-                      setImagePreview(null);
-                      setSelectedImage(null);
-                    }}
-                    className="absolute top-2 right-2 p-1 bg-gray-900 rounded-full hover:bg-gray-800"
-                  >
-                    <XMarkIcon className="w-5 h-5" />
-                  </button>
-                </div>
+  // UI Components
+  const PostSkeleton = () => (
+    <Card className="animate-pulse">
+      <CardHeader className="flex flex-row items-center gap-4">
+        <div className="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-700" />
+        <div className="space-y-2">
+          <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded" />
+          <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded" />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          <div className="h-4 w-3/4 bg-gray-200 dark:bg-gray-700 rounded" />
+          <div className="h-4 w-1/2 bg-gray-200 dark:bg-gray-700 rounded" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const PostCard = ({ post }: { post: Post }) => {
+    const isLiked = post.likes.some((like) => like.user_id === user?.id);
+    const formattedDate = new Date(post.created_at).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+
+    return (
+      <Card className="overflow-hidden">
+        <CardHeader className="flex flex-row items-start justify-between space-y-0">
+          <div className="flex items-center space-x-4">
+            <Avatar>
+              <AvatarImage src={post.user.imageUrl} />
+              <AvatarFallback>{post.user.fullName[0]}</AvatarFallback>
+            </Avatar>
+            <div>
+              <h3 className="font-semibold">{post.user.fullName}</h3>
+              <p className="text-sm text-gray-500">{formattedDate}</p>
+            </div>
+          </div>
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm">
+                <MoreHorizontal className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {post.user_id === user?.id && (
+                <DropdownMenuItem>Delete</DropdownMenuItem>
               )}
-              <div className="flex items-center justify-between">
-                <input
-                  type="file"
-                  accept="image/*"
-                  ref={imageInputRef}
-                  className="hidden"
-                  onChange={handleImageSelect}
+              <DropdownMenuItem>Report</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          <p className="text-gray-900 dark:text-gray-100">{post.content}</p>
+          {post.image_url && (
+            <div className="rounded-lg overflow-hidden">
+              <img
+                src={post.image_url}
+                alt="Post content"
+                className="w-full object-cover max-h-[512px]"
+                loading="lazy"
+              />
+            </div>
+          )}
+        </CardContent>
+
+        <CardFooter className="flex justify-between border-t pt-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => toggleLike.mutate(post.id)}
+            className={isLiked ? "text-pink-500 hover:text-pink-600" : ""}
+          >
+            <Heart className={`h-5 w-5 mr-1.5 ${isLiked ? "fill-current" : ""}`} />
+            {post.likes.length}
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowComments({
+              ...showComments,
+              [post.id]: !showComments[post.id]
+            })}
+          >
+            <MessageCircle className="h-5 w-5 mr-1.5" />
+            {post.comments.length}
+          </Button>
+
+          <Button variant="ghost" size="sm">
+            <Share2 className="h-5 w-5 mr-1.5" />
+            Share
+          </Button>
+        </CardFooter>
+
+        {showComments[post.id] && (
+          <div className="px-4 pb-4 space-y-4 border-t bg-gray-50 dark:bg-gray-800/50">
+            {post.comments.map((comment) => (
+              <div key={comment.id} className="flex items-start space-x-3 pt-4">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={comment.user.imageUrl} />
+                  <AvatarFallback>{comment.user.fullName[0]}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm">
+                    <p className="font-medium text-sm">{comment.user.fullName}</p>
+                    <p className="text-sm text-gray-700 dark:text-gray-300">
+                      {comment.content}
+                    </p>
+                  </div>
+                  <div className="mt-1">
+                    <Button variant="ghost" size="sm" className="h-auto p-0 text-xs text-gray-500">
+                      {new Date(comment.created_at).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+            
+            <div className="flex items-start space-x-3 pt-4">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={user?.imageUrl} />
+                <AvatarFallback>{user?.fullName?.[0]}</AvatarFallback>
+              </Avatar>
+              <div className="flex-1 relative">
+                <Textarea
+                  value={commentContent[post.id] || ""}
+                  onChange={(e) => setCommentContent({
+                    ...commentContent,
+                    [post.id]: e.target.value,
+                  })}
+                  placeholder="Write a comment..."
+                  className="min-h-[80px] pr-12"
                 />
-                <button
-                  onClick={() => imageInputRef.current?.click()}
-                  className="p-2 hover:bg-gray-700 rounded-full transition-colors"
+                <Button
+                  size="sm"
+                  className="absolute bottom-2 right-2"
+                  disabled={!commentContent[post.id]?.trim() || addComment.isPending}
+                  onClick={() => {
+                    if (commentContent[post.id]?.trim()) {
+                      addComment.mutate({
+                        postId: post.id,
+                        content: commentContent[post.id].trim(),
+                      });
+                    }
+                  }}
                 >
-                  <PhotoIcon className="w-6 h-6 text-blue-400" />
-                </button>
-                <button
-                  onClick={() => createPost.mutate()}
-                  disabled={
-                    (!content.trim() && !selectedImage) || createPost.isPending
-                  }
-                  className="bg-blue-500 px-6 py-2 rounded-full font-semibold hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {createPost.isPending ? "Posting..." : "Post"}
-                </button>
+                  {addComment.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                </Button>
               </div>
             </div>
           </div>
-        </div>
+        )}
+      </Card>
+    );
+  };
 
-        {/* Posts Feed */}
-        <div className="space-y-6">
-          {posts?.map((post) => (
-            <div
-              key={post.id}
-              className="bg-gray-800 rounded-xl p-4 space-y-4 hover:bg-gray-750 transition-colors"
-            >
-              <div className="flex items-center space-x-3">
-                <img
-                  src={user?.imageUrl}
-                  alt="Profile"
-                  className="w-10 h-10 rounded-full"
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+        {error && (
+          <Alert variant="destructive" className="animate-in slide-in-from-top">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Failed to load posts. Please refresh the page.
+            </AlertDescription>
+              <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-start space-x-4">
+              <Avatar>
+                <AvatarImage src={user?.imageUrl} />
+                <AvatarFallback>{user?.fullName?.[0]}</AvatarFallback>
+              </Avatar>
+              <div className="flex-1 space-y-4">
+                <Textarea
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  placeholder="What's on your mind?"
+                  className="min-h-[100px] resize-none"
                 />
-                <div>
-                  <p className="font-semibold">{user?.fullName}</p>
-                  <p className="text-sm text-gray-400">
-                    {new Date(post.created_at).toLocaleDateString(undefined, {
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </p>
-                </div>
-              </div>
 
-              <p className="text-lg">{post.content}</p>
-
-              {post.image_url && (
-                <img
-                  src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/post-images/${post.image_url}`}
-                  alt="Post"
-                  className="rounded-xl max-h-96 w-full object-cover"
-                />
-              )}
-
-              <div className="flex items-center space-x-6 pt-2">
-                <button
-                  onClick={() => toggleLike.mutate(post.id)}
-                  className="flex items-center space-x-2 group"
-                >
-                  {post.likes.some((like) => like.user_id === user?.id) ? (
-                    <HeartSolid className="w-6 h-6 text-pink-500" />
-                  ) : (
-                    <HeartOutline className="w-6 h-6 text-gray-400 group-hover:text-pink-500 transition-colors" />
-                  )}
-                  <span className="text-sm text-gray-400 group-hover:text-pink-500">
-                    {post.likes.length}
-                  </span>
-                </button>
-
-                <button
-                  onClick={() =>
-                    setShowComments({
-                      ...showComments,
-                      [post.id]: !showComments[post.id],
-                    })
-                  }
-                  className="flex items-center space-x-2 group"
-                >
-                  <ChatBubbleOvalLeftEllipsisIcon className="w-6 h-6 text-gray-400 group-hover:text-blue-500" />
-                  <span className="text-sm text-gray-400 group-hover:text-blue-500">
-                    {post.comments.length}
-                  </span>
-                </button>
-
-                <button
-                  onClick={() => handleShare(post)}
-                  className="flex items-center space-x-2 group"
-                >
-                  <ShareIcon className="w-6 h-6 text-gray-400 group-hover:text-green-500" />
-                </button>
-              </div>
-
-              {showComments[post.id] && (
-                <div className="space-y-4 mt-4 border-t border-gray-700 pt-4">
-                  {post.comments.map((comment) => (
-                    <div key={comment.id} className="flex space-x-3">
-                      <img
-                        src={user?.imageUrl}
-                        alt="Profile"
-                        className="w-8 h-8 rounded-full"
-                      />
-                      <div className="flex-1 bg-gray-700 rounded-lg p-3">
-                        <p className="text-sm">{comment.content}</p>
-                      </div>
-                    </div>
-                  ))}
-                  <div className="flex space-x-3">
+                {imagePreview && (
+                  <div className="relative rounded-lg overflow-hidden">
                     <img
-                      src={user?.imageUrl}
-                      alt="Profile"
-                      className="w-8 h-8 rounded-full"
+                      src={imagePreview}
+                      alt="Preview"
+                      className="max-h-96 w-full object-cover rounded-lg"
                     />
-                    <div className="flex-1 relative">
-                      <input
-                        type="text"
-                        value={commentContent[post.id] || ""}
-                        onChange={(e) =>
-                          setCommentContent({
-                            ...commentContent,
-                            [post.id]: e.target.value,
-                          })
-                        }
-                        placeholder="Add a comment..."
-                        className="w-full bg-gray-700 rounded-full py-2 px-4 pr-12 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <button
-                        onClick={() => {
-                          if (commentContent[post.id]?.trim()) {
-                            addComment.mutate({
-                              postId: post.id,
-                              content: commentContent[post.id],
-                            });
-                          }
-                        }}
-                        disabled={
-                          !commentContent[post.id]?.trim() ||
-                          addComment.isPending
-                        }
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-blue-500 hover:text-blue-400"
-                      >
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                          />
-                        </svg>
-                      </button>
-                    </div>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="absolute top-2 right-2"
+                      onClick={() => {
+                        setImagePreview(null);
+                        setSelectedImage(null);
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+
+                <div
+                  className="border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg p-8 text-center transition-colors hover:border-gray-300 dark:hover:border-gray-600 cursor-pointer"
+                  onClick={() => imageInputRef.current?.click()}
+                >
+                  <input
+                    type="file"
+                    accept="image/*"
+                    ref={imageInputRef}
+                    className="hidden"
+                    onChange={handleImageSelect}
+                  />
+                  <div className="flex flex-col items-center space-y-2">
+                    <ImageIcon className="h-8 w-8 text-gray-400" />
+                    <p className="text-sm text-gray-500">
+                      Drop an image here or click to upload
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Maximum file size: 5MB
+                    </p>
                   </div>
                 </div>
-              )}
+
+                <div className="flex justify-end space-x-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setContent("");
+                      setSelectedImage(null);
+                      setImagePreview(null);
+                    }}
+                  >
+                    Clear
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      try {
+                        let imageUrl;
+                        if (selectedImage) {
+                          imageUrl = await uploadImage(selectedImage);
+                        }
+                        
+                        await createPost.mutateAsync({
+                          content: content.trim(),
+                          image_url: imageUrl
+                        });
+                      } catch (err) {
+                        setError("Failed to create post. Please try again.");
+                      }
+                    }}
+                    disabled={(!content.trim() && !selectedImage) || createPost.isPending || isUploading}
+                  >
+                    {createPost.isPending || isUploading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Posting...
+                      </>
+                    ) : (
+                      "Post"
+                    )}
+                  </Button>
+                </div>
+              </div>
             </div>
-          ))}
+          </CardContent>
+        </Card>
+
+        <div className="space-y-6">
+          {isLoadingPosts ? (
+            Array.from({ length: 3 }).map((_, i) => (
+              <PostSkeleton key={i} />
+            ))
+          ) : postsError ? (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Failed to load posts. Please refresh the page.
+              </AlertDescription>
+            </Alert>
+          ) : posts?.length === 0 ? (
+            <Card className="p-8 text-center">
+              <div className="flex flex-col items-center space-y-2">
+                <MessageCircle className="h-8 w-8 text-gray-400" />
+                <p className="text-gray-500">No posts yet. Be the first to share something!</p>
+              </div>
+            </Card>
+          ) : (
+            posts?.map((post) => (
+              <PostCard key={post.id} post={post} />
+            ))
+          )}
         </div>
+
+        {posts && posts.length > 0 && (
+          <div className="flex justify-center pt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                // Implement load more functionality
+              }}
+            >
+              Load More
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
