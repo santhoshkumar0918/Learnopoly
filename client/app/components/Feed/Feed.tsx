@@ -659,11 +659,11 @@ export default function Feed() {
         <CardHeader className="flex flex-row items-start justify-between space-y-0">
           <div className="flex items-center space-x-4">
             <Avatar>
-              <AvatarImage src={post.user.imageUrl} />
-              <AvatarFallback>{post.user.fullName[0]}</AvatarFallback>
+               <AvatarImage src={post.user.imageUrl} /> 
+               <AvatarFallback>{post.user.fullName[0]}</AvatarFallback> *
             </Avatar>
             <div>
-              <h3 className="font-semibold">{post.user.fullName}</h3>
+              <h3 className="font-semibold">{post.user.id }</h3>
               <p className="text-sm text-gray-500">{formattedDate}</p>
             </div>
           </div>
