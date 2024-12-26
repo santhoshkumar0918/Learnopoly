@@ -1,55 +1,122 @@
-import { useState } from "react";
-import { supabase } from "@/app/lib/supabase";
-import { useUser } from "@clerk/nextjs";
+// CreatePost.tsx
+import React, { useState, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/use-toast";
+import { PhotoIcon, XMarkIcon } from "@heroicons/react/24/outline";
 
-export default function CreatePost() {
+interface CreatePostProps {
+  onSuccess: () => void;
+}
+
+export function CreatePost({ onSuccess }: CreatePostProps) {
   const [content, setContent] = useState("");
+  const [image, setImage] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const { user } = useUser();
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setPreview(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSubmit = async () => {
     if (!content.trim()) return;
+
     setIsLoading(true);
+    const formData = new FormData();
+    formData.append("content", content);
+    if (image) formData.append("image", image);
 
     try {
-      const { error } = await supabase.from("posts").insert([
-        {
-          content,
-          user_id: user?.id,
-          username: user?.username || user?.emailAddresses[0]?.emailAddress,
-        },
-      ]);
-
-      if (error) throw error;
+      const res = await fetch("/api/posts", {
+        method: "POST",
+        body: formData
+      });
+      
+      if (!res.ok) throw new Error("Failed to create post");
+      
       setContent("");
-    } catch (err) {
-      console.error("Error creating post:", err);
+      setImage(null);
+      setPreview(null);
+      onSuccess();
+      toast({ title: "Success", description: "Post created" });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create post",
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="border p-4 rounded-lg shadow space-y-4"
-    >
+    <div className="bg-gray-800 rounded-xl p-6 shadow-lg space-y-4">
       <textarea
-        className="w-full p-2 border rounded"
-        rows={3}
-        placeholder="What's on your mind?"
         value={content}
         onChange={(e) => setContent(e.target.value)}
-        required
+        className="w-full bg-gray-700 rounded-lg p-4 text-white resize-none min-h-[100px]"
+        placeholder="What's on your mind?"
       />
-      <button
-        type="submit"
-        disabled={isLoading}
-        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-      >
-        {isLoading ? "Posting..." : "Post"}
-      </button>
-    </form>
+
+      <AnimatePresence>
+        {preview && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="relative mt-4"
+          >
+            <img
+              src={preview}
+              alt="Preview"
+              className="rounded-lg max-h-96 w-full object-cover"
+            />
+            <button
+              onClick={() => {
+                setImage(null);
+                setPreview(null);
+              }}
+              className="absolute top-2 right-2 p-2 bg-gray-900/80 rounded-full hover:bg-gray-800"
+            >
+              <XMarkIcon className="w-5 h-5" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="flex justify-between items-center">
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          onChange={handleImageChange}
+          className="hidden"
+        />
+        <Button
+          variant="ghost"
+          onClick={() => fileRef.current?.click()}
+          className="text-gray-300 hover:text-blue-400"
+        >
+          <PhotoIcon className="w-5 h-5 mr-2" />
+          Add Image
+        </Button>
+        <Button
+          onClick={handleSubmit}
+          disabled={!content.trim() || isLoading}
+          className="bg-blue-500 hover:bg-blue-600"
+        >
+          {isLoading ? "Posting..." : "Post"}
+        </Button>
+      </div>
+    </div>
   );
 }
