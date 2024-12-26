@@ -2,7 +2,7 @@
 import React, { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@/hooks/use-toast";
 import { PhotoIcon, XMarkIcon } from "@heroicons/react/24/outline";
 
 interface CreatePostProps {
