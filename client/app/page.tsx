@@ -11,7 +11,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 
 export default function Home() {
+
+  
   return (
+
+    
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
       {/* Hero Section */}
       <div className="relative overflow-hidden">
@@ -76,7 +80,6 @@ export default function Home() {
               </CardContent>
             </Card>
           </TabsContent>
-          {/* Similar TabsContent for other features */}
         </Tabs>
       </div>
 
@@ -167,6 +170,7 @@ interface StatCardProps {
 }
 
 const StatCard = ({ number, label }: StatCardProps) => (
+  
   <Card>
     <CardContent className="pt-6">
       <div className="text-center">
