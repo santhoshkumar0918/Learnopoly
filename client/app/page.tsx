@@ -422,7 +422,7 @@ export default function Home() {
             <div className="flex justify-center">
               <Badge
                 variant="secondary"
-                className="bg-teal-400/5 text-teal-400 border-teal-400/10 px-6 py-2 text-sm backdrop-blur-sm"
+                className="bg-teal-400/10 text-teal-500 border-teal-400/10 px-6 py-2 text-sm backdrop-blur-sm"
               >
                 Welcome to Web3 Learning
               </Badge>
@@ -448,7 +448,7 @@ export default function Home() {
               <Button
                 variant="outline"
                 size="lg"
-                className="border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-teal-400 px-8 py-6 text-lg font-medium rounded-xl"
+                className="border-slate-700 text-slate-600 hover:bg-slate-800 hover:text-teal-400 px-8 py-6 text-lg font-medium rounded-xl"
               >
                 Explore Courses
               </Button>

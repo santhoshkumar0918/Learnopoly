@@ -429,51 +429,54 @@
 //   );
 // }
 
+"use client";
 
-import React, { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CreatePost } from "./CreatePost";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useRef } from "react";
+import { useUser } from "@clerk/nextjs";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { createClient } from "@supabase/supabase-js";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { toast } from "@/hooks/use-toast";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-  HeartIcon,
-  ChatBubbleOvalLeftIcon,
-  ShareIcon,
-  LinkIcon,
-  TrashIcon,
-} from "@heroicons/react/24/outline";
-import { HeartIcon as HeartSolid } from "@heroicons/react/24/solid";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Separator } from "@/components/ui/separator";
+import {
+  Heart,
+  MessageCircle,
+  Share,
+  Image as ImageIcon,
+  MoreVertical,
+  Pencil,
+  Trash2,
+  X,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 interface Post {
   id: string;
   content: string;
   created_at: string;
   user_id: string;
-  username: string;
-  userImage: string;
   image_url?: string;
   comments: Comment[];
   likes: Like[];
-  isLiked: boolean;
 }
 
 interface Comment {
@@ -481,8 +484,6 @@ interface Comment {
   content: string;
   user_id: string;
   created_at: string;
-  username: string;
-  userImage: string;
 }
 
 interface Like {
@@ -490,260 +491,452 @@ interface Like {
   user_id: string;
 }
 
-const api = {
-  getPosts: async () => {
-    const res = await fetch("/api/posts");
-    if (!res.ok) throw new Error("Failed to fetch posts");
-    return res.json();
-  },
-  toggleLike: async (postId: string) => {
-    const res = await fetch(`/api/posts/${postId}/like`, { method: "POST" });
-    if (!res.ok) throw new Error("Failed to toggle like");
-  },
-  deletePost: async (postId: string) => {
-    const res = await fetch(`/api/posts/${postId}`, { method: "DELETE" });
-    if (!res.ok) throw new Error("Failed to delete post");
-  },
-  addComment: async (postId: string, content: string) => {
-    const res = await fetch(`/api/posts/${postId}/comments`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content }),
-    });
-    if (!res.ok) throw new Error("Failed to add comment");
-    return res.json();
-  },
-};
-
 export default function Feed() {
+  const [content, setContent] = useState("");
+  const [editingPost, setEditingPost] = useState<{
+    id: string;
+    content: string;
+  } | null>(null);
+  const [commentContent, setCommentContent] = useState<Record<string, string>>(
+    {}
+  );
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [showComments, setShowComments] = useState<Record<string, boolean>>({});
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const { user, isLoaded } = useUser();
   const queryClient = useQueryClient();
-  const [commentContent, setCommentContent] = useState("");
 
-  const { data: posts, isLoading } = useQuery<Post[]>({
+  // Query and mutation functions remain the same
+  const { data: posts, isLoading } = useQuery({
     queryKey: ["posts"],
-    queryFn: api.getPosts,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("posts")
+        .select(
+          `
+          id, content, created_at, user_id, image_url,
+          comments(id, content, user_id, created_at),
+          likes(id, user_id)
+        `
+        )
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as Post[];
+    },
+    enabled: isLoaded && !!user,
   });
 
-  const handleLike = async (postId: string) => {
-    try {
-      await api.toggleLike(postId);
+  // Mutation for creating a post
+  const createPost = useMutation({
+    mutationFn: async () => {
+      if (!user) throw new Error("User not authenticated");
+
+      const { data: userData } = await supabase
+        .from("users")
+        .select("id")
+        .eq("clerk_id", user.id)
+        .single();
+
+      let imagePath = null;
+      if (selectedImage) {
+        imagePath = await uploadImage(selectedImage);
+      }
+
+      const { error } = await supabase.from("posts").insert({
+        content,
+        user_id: userData?.id,
+        image_url: imagePath,
+      });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["posts"] });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to like post",
-        variant: "destructive",
-      });
-    }
-  };
+      setContent("");
+      setSelectedImage(null);
+      setImagePreview(null);
+    },
+  });
 
-  const handleDelete = async (postId: string) => {
-    try {
-      await api.deletePost(postId);
+  // Mutation for adding comments
+  const addComment = useMutation({
+    mutationFn: async ({
+      postId,
+      content,
+    }: {
+      postId: string;
+      content: string;
+    }) => {
+      if (!user) throw new Error("User not authenticated");
+
+      const { data: userData } = await supabase
+        .from("users")
+        .select("id")
+        .eq("clerk_id", user.id)
+        .single();
+
+      const { error } = await supabase.from("comments").insert({
+        content,
+        post_id: postId,
+        user_id: userData?.id,
+      });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["posts"] });
-      toast({ title: "Success", description: "Post deleted" });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete post",
-        variant: "destructive",
-      });
-    }
-  };
+      setCommentContent({});
+    },
+  });
 
-  const handleComment = async (postId: string) => {
-    if (!commentContent.trim()) return;
-    try {
-      await api.addComment(postId, commentContent);
-      setCommentContent("");
+  // Mutation for toggling likes
+  const toggleLike = useMutation({
+    mutationFn: async (postId: string) => {
+      if (!user) throw new Error("User not authenticated");
+
+      const { data: userData } = await supabase
+        .from("users")
+        .select("id")
+        .eq("clerk_id", user.id)
+        .single();
+
+      const { data: existingLike } = await supabase
+        .from("likes")
+        .select("*")
+        .eq("post_id", postId)
+        .eq("user_id", userData?.id)
+        .single();
+
+      if (existingLike) {
+        await supabase.from("likes").delete().eq("id", existingLike.id);
+      } else {
+        await supabase.from("likes").insert({
+          post_id: postId,
+          user_id: userData?.id,
+        });
+      }
+    },
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["posts"] });
-      toast({ title: "Success", description: "Comment added" });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to add comment",
-        variant: "destructive",
-      });
+    },
+  });
+
+  // Mutation for deleting a post
+  const deletePost = useMutation({
+    mutationFn: async (postId: string) => {
+      const { error } = await supabase.from("posts").delete().eq("id", postId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+    },
+  });
+
+  // Existing mutations remain the same but editPost is updated
+  const editPost = useMutation({
+    mutationFn: async ({
+      postId,
+      newContent,
+    }: {
+      postId: string;
+      newContent: string;
+    }) => {
+      const { error } = await supabase
+        .from("posts")
+        .update({ content: newContent })
+        .eq("id", postId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+      setEditingPost(null);
+    },
+  });
+
+  // Other mutation functions remain the same
+
+  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setImagePreview(reader.result as string);
+      reader.readAsDataURL(file);
     }
   };
 
-  const handleShare = async (postId: string) => {
+  const handleShare = async (post: Post) => {
     try {
-      await navigator.clipboard.writeText(
-        `${window.location.origin}/posts/${postId}`
-      );
-      toast({ title: "Success", description: "Link copied" });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to copy link",
-        variant: "destructive",
+      await navigator.share({
+        title: "Check out this post!",
+        text: post.content,
+        url: window.location.href,
       });
+    } catch (error) {
+      console.error("Error sharing:", error);
     }
   };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500" />
-      </div>
-    );
-  }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      <div className="max-w-2xl mx-auto p-4 space-y-6">
-        <CreatePost
-          onSuccess={() =>
-            queryClient.invalidateQueries({ queryKey: ["posts"] })
-          }
-        />
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+        {/* Create Post Card */}
+        <Card className="border-teal-200 dark:border-teal-800 shadow-lg">
+          <CardHeader className="space-y-4">
+            <div className="flex items-start space-x-3">
+              <Avatar>
+                <AvatarImage src={user?.imageUrl} alt="Profile" />
+                <AvatarFallback>{user?.firstName?.[0] || "U"}</AvatarFallback>
+              </Avatar>
+              <Textarea
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="What's on your mind?"
+                className="flex-1 min-h-[120px] resize-none focus:ring-teal-500"
+              />
+            </div>
+          </CardHeader>
 
-        <AnimatePresence>
-          {posts?.map((post) => (
-            <motion.div
-              key={post.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="bg-gray-800 rounded-xl p-6 shadow-lg"
-            >
-              <div className="flex items-start space-x-4">
+          {imagePreview && (
+            <CardContent>
+              <div className="relative rounded-lg overflow-hidden">
                 <img
-                  src={post.userImage}
-                  alt={post.username}
-                  className="w-12 h-12 rounded-full"
+                  src={imagePreview}
+                  alt="Preview"
+                  className="max-h-96 w-full object-cover"
                 />
-                <div className="flex-1 space-y-4">
-                  <div className="flex justify-between">
-                    <h3 className="font-semibold">{post.username}</h3>
-                    <span className="text-gray-400 text-sm">
-                      {new Date(post.created_at).toLocaleDateString()}
-                    </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-2 right-2"
+                  onClick={() => {
+                    setImagePreview(null);
+                    setSelectedImage(null);
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardContent>
+          )}
+
+          <CardFooter className="justify-between">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => imageInputRef.current?.click()}
+              className="text-teal-600 hover:text-teal-700 hover:bg-teal-50"
+            >
+              <ImageIcon className="w-4 h-4 mr-2" />
+              Upload Image
+            </Button>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageSelect}
+              className="hidden"
+            />
+            <Button
+              onClick={() => createPost.mutate()}
+              disabled={!content && !selectedImage}
+              className="bg-teal-600 hover:bg-teal-700 text-white"
+            >
+              Post
+            </Button>
+          </CardFooter>
+        </Card>
+
+        {/* Feed Posts */}
+        {isLoading ? (
+          <div className="text-center text-gray-500">Loading posts...</div>
+        ) : (
+          posts?.map((post) => (
+            <Card
+              key={post.id}
+              className="border-teal-200 dark:border-teal-800 shadow-lg"
+            >
+              <CardHeader className="space-y-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Avatar>
+                      <AvatarImage src={user?.imageUrl} alt="Profile" />
+                      <AvatarFallback>{post.user_id ? post.user_id[0] : "U"}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <div className="font-semibold">{post.user_id}</div>
+                      <div className="text-sm text-gray-500">
+                        {post.created_at}
+                      </div>
+                    </div>
                   </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() =>
+                          setEditingPost({ id: post.id, content: post.content })
+                        }
+                      >
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => deletePost.mutate(post.id)}
+                        className="text-red-600"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </CardHeader>
 
-                  <p className="text-gray-200">{post.content}</p>
-
-                  {post.image_url && (
-                    <img
-                      src={post.image_url}
-                      alt=""
-                      className="rounded-lg w-full object-cover max-h-[500px]"
+              <CardContent className="space-y-4">
+                {editingPost?.id === post.id ? (
+                  <div className="space-y-4">
+                    <Textarea
+                      value={editingPost.content}
+                      onChange={(e) =>
+                        setEditingPost({
+                          ...editingPost,
+                          content: e.target.value,
+                        })
+                      }
+                      className="w-full"
                     />
-                  )}
+                    <div className="flex justify-end space-x-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => setEditingPost(null)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={() =>
+                          editPost.mutate({
+                            postId: editingPost.id,
+                            newContent: editingPost.content,
+                          })
+                        }
+                        className="bg-teal-600 hover:bg-teal-700 text-white"
+                      >
+                        Save
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <p>{post.content}</p>
+                )}
 
-                  <div className="flex items-center space-x-6">
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleLike(post.id)}
-                      className="text-gray-400 hover:text-red-500"
+                {post.image_url && (
+                  <img
+                    src={post.image_url}
+                    alt="Post"
+                    className="w-full rounded-lg object-cover"
+                  />
+                )}
+              </CardContent>
+
+              <CardFooter className="flex justify-between pt-4">
+                <div className="flex space-x-4">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleLike.mutate(post.id)}
+                    className={cn(
+                      "text-gray-600 hover:text-red-600",
+                      post.likes.length && "text-red-600"
+                    )}
+                  >
+                    <Heart className="h-4 w-4 mr-2" />
+                    {post.likes.length}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      setShowComments((prev) => ({
+                        ...prev,
+                        [post.id]: !prev[post.id],
+                      }))
+                    }
+                    className="text-gray-600 hover:text-teal-600"
+                  >
+                    <MessageCircle className="h-4 w-4 mr-2" />
+                    {post.comments.length}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleShare(post)}
+                    className="text-gray-600 hover:text-teal-600"
+                  >
+                    <Share className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardFooter>
+
+              {showComments[post.id] && (
+                <div className="px-6 pb-6 space-y-4">
+                  <Separator className="my-4" />
+                  {post.comments.map((comment) => (
+                    <Card
+                      key={comment.id}
+                      className="bg-gray-50 dark:bg-gray-800"
                     >
-                      {post.isLiked ? (
-                        <HeartSolid className="w-5 h-5 text-red-500" />
-                      ) : (
-                        <HeartIcon className="w-5 h-5" />
-                      )}
-                      <span className="ml-2">{post.likes.length}</span>
-                    </Button>
-
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          className="text-gray-400 hover:text-blue-400"
-                        >
-                          <ChatBubbleOvalLeftIcon className="w-5 h-5 mr-2" />
-                          {post.comments.length}
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="bg-gray-800 text-white">
-                        <DialogHeader>
-                          <DialogTitle>Comments</DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-4">
-                          {post.comments.map((comment) => (
-                            <div
-                              key={comment.id}
-                              className="p-4 bg-gray-700 rounded-lg"
-                            >
-                              <div className="flex items-start space-x-3">
-                                <img
-                                  src={comment.userImage}
-                                  alt=""
-                                  className="w-8 h-8 rounded-full"
-                                />
-                                <div>
-                                  <div className="font-semibold">
-                                    {comment.username}
-                                  </div>
-                                  <p className="text-gray-300">
-                                    {comment.content}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                          <div className="flex space-x-2">
-                            <input
-                              value={commentContent}
-                              onChange={(e) =>
-                                setCommentContent(e.target.value)
-                              }
-                              placeholder="Write a comment..."
-                              className="flex-1 bg-gray-700 rounded-lg px-4 py-2"
-                            />
-                            <Button onClick={() => handleComment(post.id)}>
-                              Send
-                            </Button>
-                          </div>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-
+                      <CardContent className="py-4">
+                        <p>{comment.content}</p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                  <div className="flex space-x-2">
+                    <Input
+                      value={commentContent[post.id] || ""}
+                      onChange={(e) =>
+                        setCommentContent((prev) => ({
+                          ...prev,
+                          [post.id]: e.target.value,
+                        }))
+                      }
+                      placeholder="Add a comment..."
+                      className="flex-1"
+                    />
                     <Button
-                      variant="ghost"
-                      onClick={() => handleShare(post.id)}
-                      className="text-gray-400 hover:text-green-400"
+                      onClick={() =>
+                        addComment.mutate({
+                          postId: post.id,
+                          content: commentContent[post.id],
+                        })
+                      }
+                      disabled={!commentContent[post.id]}
+                      className="bg-teal-600 hover:bg-teal-700 text-white"
                     >
-                      <ShareIcon className="w-5 h-5" />
+                      Comment
                     </Button>
-
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          className="text-gray-400 hover:text-red-400"
-                        >
-                          <TrashIcon className="w-5 h-5" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent className="bg-gray-800 text-white">
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Post</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Are you sure? This cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel className="bg-gray-700 hover:bg-gray-600">
-                            Cancel
-                          </AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => handleDelete(post.id)}
-                            className="bg-red-500 hover:bg-red-600"
-                          >
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
                   </div>
                 </div>
-              </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+              )}
+            </Card>
+          ))
+        )}
       </div>
     </div>
   );
+}
+async function uploadImage(file: File): Promise<string> {
+  const fileExt = file.name.split(".").pop();
+  const fileName = `${Math.random()}.${fileExt}`;
+  const { error, data } = await supabase.storage
+    .from("post-images")
+    .upload(fileName, file);
+  if (error) throw error;
+  return data.path;
 }
