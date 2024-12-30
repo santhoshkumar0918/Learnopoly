@@ -564,7 +564,6 @@ export default function Feed() {
     },
   });
 
-  // Mutation for adding comments
   const addComment = useMutation({
     mutationFn: async ({
       postId,
@@ -748,10 +747,10 @@ export default function Feed() {
             />
             <Button
               onClick={() => createPost.mutate()}
-              disabled={(!content && !selectedImage) || createPost.isLoading}
+              disabled={(!content && !selectedImage) || createPost.isPending}
               className="bg-teal-600 hover:bg-teal-700 text-white"
             >
-              {createPost.isLoading ? (
+              {createPost.status === "pending" ? (
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
               ) : null}
               Share Post
@@ -991,11 +990,11 @@ export default function Feed() {
                                   }
                                   disabled={
                                     !commentContent[post.id]?.trim() ||
-                                    addComment.status === 'pending'
+                                    addComment.status === "pending"
                                   }
                                   className="bg-teal-600 hover:bg-teal-700 text-white"
                                 >
-                                  {addComment.status === 'loading' ? (
+                                  {createPost.status === "pending" ? (
                                     <Loader2 className="w-4 h-4 animate-spin" />
                                   ) : (
                                     <Send className="w-4 h-4" />
