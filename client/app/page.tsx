@@ -410,7 +410,7 @@ import { Badge } from "@/components/ui/badge";
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-slate-950">
+    <div className="min-h-screen  bg-slate-950">
       {/* Hero Section */}
       <div className="relative min-h-[80vh] flex items-center">
         {/* Gradient Background */}
