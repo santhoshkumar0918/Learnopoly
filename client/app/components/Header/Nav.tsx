@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/tooltip";
 
 import { WalletIcon, ShieldCheckIcon } from "lucide-react";
+import { TooltipProvider } from "@radix-ui/react-tooltip";
 
 export default function Nav() {
   const [activeItem, setActiveItem] = useState("home");
@@ -219,6 +220,7 @@ export default function Nav() {
     };
 
     return (
+      <TooltipProvider>
       <div className="flex min-h-screen">
         {/* Desktop Sidebar */}
         <div className="hidden md:flex flex-col w-64 bg-slate-900 text-white fixed h-screen">
@@ -322,5 +324,6 @@ export default function Nav() {
           </SheetContent>
         </Sheet>
       </div>
+    </TooltipProvider>
     );
 }
