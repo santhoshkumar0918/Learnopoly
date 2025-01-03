@@ -8,7 +8,7 @@ export default function Dashboard() {
   return (
     <div>
       
-      <div className="w-full mt-40 mx-auto ">
+      <div className="w-full  bg-blue-200 mx-auto ">
         <h1 className="text-3xl font-bold mb-4">
           Welcome, {isLoaded && user ? user.firstName : "Guest"}
         </h1>
