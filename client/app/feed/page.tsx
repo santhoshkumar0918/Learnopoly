@@ -1157,7 +1157,12 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@radix-ui/react-dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@supabase/supabase-js";
@@ -1166,8 +1171,6 @@ import {
   HeartIcon as HeartOutline,
   ChatBubbleOvalLeftEllipsisIcon,
   ShareIcon,
-  PhotoIcon,
-  XMarkIcon,
   PencilIcon,
   TrashIcon,
   BookmarkIcon,
@@ -1440,10 +1443,10 @@ const queryClient = useQueryClient();
   });
 
   return (
-       <div className="min-h-screen bg-gray-800 text-white">
-        <div className="absolute top-4 right-4">
-          <CreatePostDialog/>
-        </div>
+    <div className="min-h-screen w-[1500px]  bg-gray-800 text-white">
+      <div className="absolute top-4 right-4">
+        <CreatePostDialog />
+      </div>
       <div>
         <h1 className="text-3xl font-bold mb-4">
           Welcome, {isLoaded && user ? user.firstName : "Guest"}
