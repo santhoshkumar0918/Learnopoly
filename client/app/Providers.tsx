@@ -53,6 +53,7 @@ export default function ClientProviders({
   );
 
   return (
+   
     <QueryClientProvider client={queryClient}>
       <div className="flex min-h-screen w-screen bg-gray-900 text-white">
         {/* Sidebar */}
@@ -64,3 +65,11 @@ export default function ClientProviders({
     </QueryClientProvider>
   );
 }
+
+
+ // <QueryClientProvider client={queryClient}>
+    //   <div className="flex">
+    //     <ResponsiveNav />
+    //     <main className="mx-auto ml-64 w-full">{children}</main>
+    //   </div>
+    // </QueryClientProvider>
