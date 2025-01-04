@@ -1443,12 +1443,12 @@ const queryClient = useQueryClient();
   });
 
   return (
-    <div className="min-h-screen w-[1500px]  bg-gray-800 text-white">
-      <div className="absolute top-4 right-4">
+    <div className="min-h-screen w-full overflow-x-hidden bg-gray-800 text-white">
+      <div className="fixed top-4 right-4">
         <CreatePostDialog />
       </div>
       <div>
-        <h1 className="text-3xl font-bold mb-4">
+        <h1 className="text-3xl ml-72 mt-3 font-bold mb-4">
           Welcome, {isLoaded && user ? user.firstName : "Guest"}
         </h1>
       </div>
