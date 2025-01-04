@@ -1443,7 +1443,7 @@ const queryClient = useQueryClient();
   });
 
   return (
-    <div className="min-h-screen w-full overflow-x-hidden bg-gray-800 text-white">
+    <div className="min-h-screen w-full overflow-x-hidden ml-14 text-white">
       <div className="fixed top-4 right-4">
         <CreatePostDialog />
       </div>
